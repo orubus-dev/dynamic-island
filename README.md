@@ -17,6 +17,16 @@ A fork of the excellent [Akira9021/Dynamic-Island-](https://github.com/Akira9021
 
 ---
 
+## ✨ What's new in 1.9.0 — Part 2
+
+- 🔊 **Volume slider** — long-press the right half of the island and slide; the island morphs into a slim volume bar with haptic ticks.
+- 🎧 **Bluetooth** — device name + battery in the player, custom photo icons per device (`System Alerts → Connections → Custom device icons`).
+- 🛡️ **Popup protection** — a doctor screen in Permissions (engine / listener / battery / self-heal) plus `tools/orubus-setup.sh` and `orubus-setup.bat`: one script grants everything over wireless debugging and verifies each step.
+- 👆 **Rebuilt swipes** — cards follow the finger, flicks count, notices fly out left/right/up.
+- 📶 **Hotspot that works** — detection via the system tethered-interfaces list every 2 s (plus interface-name fallback), USB tethering included.
+- 🧭 **Navigation fixed** — the back stack survives process death; the Liquid Glass / Effects / Size-with-activity screens are back and reachable; unknown routes fail safe.
+- ✨ **Refraction dock** — layered glass: lens gradient, chromatic edge fringe, slow sheen.
+
 ## ✨ What's new in 1.7.0 (the Orubus fork)
 
 ### 🫀 Island Engine — the island can no longer silently die

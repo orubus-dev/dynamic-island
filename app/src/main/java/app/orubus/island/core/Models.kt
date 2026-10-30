@@ -178,6 +178,9 @@ data class StopwatchState(val startedAt: Long?, val accumulated: Long) {
 
 data class BatteryInfo(val level: Int = -1, val charging: Boolean = false)
 
+/** Подключённые наушники: имя и заряд — для плеера в раскрытом острове. */
+data class HeadsetInfo(val name: String?, val battery: Int?, val address: String)
+
 /** Как событие выглядит в острове. */
 enum class NoticeStyle {
     /** Широкая плашка почти во всю ширину: зарядка, наушники, Wi-Fi */
@@ -277,6 +280,8 @@ data class Notice(
     val update: app.orubus.island.update.Release? = null,
     /** Цвет фона плашки от «Автоцвета фона» (подобран по значку приложения); null — обычный */
     val bg: Long? = null,
+    /** Свой значок Bluetooth-устройства (загруженная картинка); null — обычный значок события */
+    val deviceIcon: ImageBitmap? = null,
     val id: Long = ids.incrementAndGet(),
 ) {
     private companion object {

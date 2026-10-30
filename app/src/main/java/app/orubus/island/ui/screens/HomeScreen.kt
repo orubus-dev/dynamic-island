@@ -30,24 +30,30 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.AccessibilityNew
 import androidx.compose.material.icons.rounded.Alarm
+import androidx.compose.material.icons.rounded.BatteryFull
 import androidx.compose.material.icons.rounded.Bluetooth
+import androidx.compose.material.icons.rounded.BluetoothConnected
 import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.Campaign
 import androidx.compose.material.icons.rounded.Call
 import androidx.compose.material.icons.rounded.ChatBubble
+import androidx.compose.material.icons.rounded.HealthAndSafety
 import androidx.compose.material.icons.rounded.HourglassBottom
 import androidx.compose.material.icons.rounded.Lightbulb
 import androidx.compose.material.icons.rounded.Navigation
 import androidx.compose.material.icons.rounded.NewReleases
 import androidx.compose.material.icons.rounded.Nfc
 import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.NotificationsOff
 import androidx.compose.material.icons.rounded.PowerSettingsNew
 import androidx.compose.material.icons.rounded.Science
+import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.VerifiedUser
 import androidx.compose.material.icons.rounded.Widgets
+import androidx.compose.material.icons.rounded.WifiTethering
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -55,6 +61,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -89,7 +96,9 @@ import app.orubus.island.island.glassSurface
 import app.orubus.island.island.islandGlow
 import app.orubus.island.island.islandShape
 import app.orubus.island.island.rememberHaptic
+import app.orubus.island.service.IslandEngine
 import app.orubus.island.service.NotificationParser
+import app.orubus.island.service.PrivacyMonitor
 import app.orubus.island.service.SystemBanners
 import app.orubus.island.ui.Group
 import app.orubus.island.ui.GlassCategory
@@ -314,7 +323,7 @@ private fun DoubleBannerCard(app: String, onFix: () -> Unit, onHide: () -> Unit)
     }
 }
 
-/** «Разрешения»: что острову нужно от системы и зачем. */
+/** «Разрешения»: что острову нужно от системы и зачем + защита от пропусков. */
 @Composable
 fun PermissionsScreen(onBack: () -> Unit, open: (Screen) -> Unit) {
     val context = LocalContext.current
@@ -361,6 +370,41 @@ fun PermissionsScreen(onBack: () -> Unit, open: (Screen) -> Unit) {
             ) { Status(perms.bluetooth) }
         }
 
+        SectionHeader(tr("Защита от пропусков", "Popup protection"))
+        Group {
+            val health by IslandEngine.health.collectAsState()
+            val (batteryOk, _) = rememberOnResume { Perms.batteryUnrestricted(context) }
+            GroupItem(
+                Pos.First, Icons.Rounded.HealthAndSafety, tr("Движок острова", "Island engine"),
+                when (health.state) {
+                    IslandEngine.State.UP -> tr("Жив: окно на экране, пульс свежий", "Alive: window on screen, fresh pulse")
+                    IslandEngine.State.RECOVERING -> tr("Оживляю службы…", "Reviving services…")
+                    IslandEngine.State.DOWN -> tr("Не запущен — включите службу в спец. возможностях", "Not running — turn the service on in Accessibility")
+                },
+                onClick = { open(Screen.KEEPALIVE) }, color = Tile.Green,
+            ) { Status(health.state == IslandEngine.State.UP) }
+            GroupItem(
+                Pos.Middle, Icons.Rounded.NotificationsActive, tr("Служба уведомлений", "Notification listener"),
+                if (health.notifListener) tr("Привязана — плашки не пропускаются", "Bound — popups are not missed")
+                else tr("Не привязана — включите доступ к уведомлениям", "Not bound — enable notification access"),
+                onClick = { Perms.openNotifications(context) }, color = Tile.Red,
+            ) { Status(health.notifListener) }
+            GroupItem(
+                Pos.Middle, Icons.Rounded.BatteryFull, tr("Батарея без ограничений", "Battery unrestricted"),
+                if (batteryOk) tr("Android не глушит остров", "Android doesn't throttle the island")
+                else tr("Отключите оптимизацию батареи", "Turn off battery optimization"),
+                onClick = { Perms.openBattery(context) }, color = Tile.Orange,
+            ) { Status(batteryOk) }
+            GroupItem(
+                Pos.Last, Icons.Rounded.Security, tr("Самолечение через adb", "Self-heal over adb"),
+                if (health.canSelfHeal) tr("Включено — остров поднимается сам", "On — the island revives itself")
+                else tr("Одна команда через беспроводную отладку", "One command via wireless debugging"),
+                onClick = { open(Screen.KEEPALIVE) }, color = Tile.Indigo,
+            ) { Status(health.canSelfHeal) }
+        }
+
+        WirelessAdbCard()
+
         SectionHeader(tr("Если не включается", "If it doesn't turn on"))
         Group {
             GroupItem(Pos.First, Icons.Rounded.Lightbulb, tr("Инструкция", "Instructions"),
@@ -372,6 +416,68 @@ fun PermissionsScreen(onBack: () -> Unit, open: (Screen) -> Unit) {
     }
 }
 
+/** Команды adb, которые закрывают все дыры: самолечение и защита от «съедания» острова системой. */
+internal fun adbCommands(): String = listOf(
+    "adb shell pm grant app.orubus.island android.permission.WRITE_SECURE_SETTINGS",
+    "adb shell dumpsys deviceidle whitelist +app.orubus.island",
+    "adb shell cmd appops set app.orubus.island RUN_IN_BACKGROUND allow",
+    "adb shell am start-foreground-service -n app.orubus.island/app.orubus.island.service.KeepAliveService",
+).joinToString("\n")
+
+/** Карточка «Беспроводная отладка»: как за пару минут выдать острову всё, чтобы ни одна плашка не пропала. */
+@Composable
+private fun WirelessAdbCard() {
+    val context = LocalContext.current
+    var copied by remember { mutableStateOf(false) }
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(28.dp))
+            .background(Ui.Card)
+            .padding(20.dp),
+    ) {
+        Text(tr("Беспроводная отладка за 2 минуты", "Wireless debugging in 2 minutes"), color = Ui.Text, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(6.dp))
+        Text(
+            tr(
+                "Ни одна плашка не пропадёт, если один раз выдать острову два системных разрешения через adb — " +
+                    "компьютер не нужен, всё делается с самого телефона:\n" +
+                    "1. Настройки → «Для разработчиков» → «Беспроводная отладка» — включите и нажмите «Подключить».\n" +
+                    "2. Установите любое приложение локального adb (LADB, Shizuku) или подключитесь с ПК: adb pair, затем adb connect.\n" +
+                    "3. Вставьте команды справа — или запустите tools/orubus-setup.sh из репозитория: он проверит всё сам и покажет галочки.",
+                "No popup will be missed if you grant the island two system permissions over adb once — no PC needed, " +
+                    "everything works from the phone itself:\n" +
+                    "1. Settings → Developer options → Wireless debugging — turn it on and tap \"Pair\".\n" +
+                    "2. Install any local adb app (LADB, Shizuku) or connect from a PC: adb pair, then adb connect.\n" +
+                    "3. Paste the commands — or run tools/orubus-setup.sh from the repo: it verifies everything and prints checkmarks.",
+            ),
+            color = Ui.Sub, fontSize = 14.sp, lineHeight = 20.sp,
+        )
+        Spacer(Modifier.height(14.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier
+                    .clip(CircleShape)
+                    .background(Ui.Primary)
+                    .clickable {
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Orubus Island", adbCommands()))
+                        copied = true
+                    }
+                    .padding(horizontal = 18.dp, vertical = 10.dp),
+            ) {
+                Text(
+                    if (copied) tr("Скопировано ✓", "Copied ✓") else tr("Копировать команды", "Copy commands"),
+                    color = Ui.OnPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                )
+            }
+            Text(
+                tr("WRITE_SECURE_SETTINGS + белый список батареи", "WRITE_SECURE_SETTINGS + battery whitelist"),
+                color = Ui.Sub.copy(alpha = 0.7f), fontSize = 12.sp,
+            )
+        }
+    }
+}
 /** Пример для «Проверки»: значок, название, что увидите, и что делает нажатие. */
 private class Demo(val icon: ImageVector, val title: String, val caption: String, val color: Color, val run: () -> Unit)
 
@@ -479,6 +585,19 @@ private fun demos(context: Context): List<Demo> = listOf(
     Demo(Icons.Rounded.SystemUpdate, tr("Обновление", "Update"),
         tr("Карточка новой версии: загрузка и «Обновлено»", "The new version card: download, then Updated"), Tile.Pink) {
         UpdateChecker.showDemo(context)
+    },
+    Demo(Icons.Rounded.WifiTethering, tr("Хотспот", "Hotspot"),
+        tr("Плашка при раздаче интернета", "The notice when you share your internet"), Tile.Blue) {
+        PrivacyMonitor.demoHotspot()
+    },
+    Demo(Icons.Rounded.BluetoothConnected, tr("Наушники", "Headphones"),
+        tr("Подключение с зарядом в кольце", "Connected, with the charge in a ring"), Tile.Indigo) {
+        IslandBus.post(
+            Notice(
+                tr("boAt Airdopes 141", "boAt Airdopes 141"), null, Ios.load(context, R.drawable.ios_headset), Tints.Green,
+                ring = 0.75f, caption = tr("Подключено", "Connected"),
+            ),
+        )
     },
 )
 

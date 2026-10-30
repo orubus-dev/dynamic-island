@@ -12,6 +12,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.database.ContentObserver
+import android.graphics.BitmapFactory
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
 import android.media.AudioManager
@@ -26,10 +27,13 @@ import android.os.PowerManager
 import android.os.SystemClock
 import android.provider.Settings
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.content.ContextCompat
 import androidx.core.content.IntentCompat
 import app.orubus.island.core.BatteryInfo
 import app.orubus.island.core.Controls
+import app.orubus.island.core.HeadsetInfo
 import app.orubus.island.core.IslandBus
 import app.orubus.island.core.Notice
 import app.orubus.island.core.NoticeStyle
@@ -243,17 +247,25 @@ class SystemEvents(private val context: Context) {
                     device.bluetoothClass?.majorDeviceClass == BluetoothClass.Device.Major.AUDIO_VIDEO
                 }.getOrDefault(false)
                 if (!isAudio) return
+                // Имя запоминаем: без разрешения в следующий раз всё равно покажем его
+                val knownName = name ?: SettingsRepo.current.btKnown[device.address]
                 if (intent.action == BluetoothDevice.ACTION_ACL_CONNECTED) {
+                    if (name != null && SettingsRepo.current.btKnown[device.address] != name) {
+                        runCatching { SettingsRepo.update { copy(btKnown = btKnown + (device.address to name)) } }
+                    }
                     val battery = headsetBattery[device.address]
+                    IslandBus.headset.value = HeadsetInfo(knownName, battery, device.address)
                     notice(
                         s.evHeadsetOn,
-                        Notice(name ?: tr("Наушники", "Headphones"), null, ic(R.drawable.ios_headset), Tints.Green,
-                            ring = battery?.let { it / 100f }, caption = tr("Подключено", "Connected")),
+                        Notice(knownName ?: tr("Наушники", "Headphones"), null, ic(R.drawable.ios_headset), Tints.Green,
+                            ring = battery?.let { it / 100f }, caption = tr("Подключено", "Connected"),
+                            deviceIcon = btIcon(device.address)),
                     )
                 } else {
                     headsetBattery.remove(device.address)
-                    notice(s.evHeadsetOff, Notice(name ?: tr("Наушники", "Headphones"), null, ic(R.drawable.ios_headset), Tints.Gray,
-                        caption = tr("Отключено", "Disconnected")))
+                    if (IslandBus.headset.value?.address == device.address) IslandBus.headset.value = null
+                    notice(s.evHeadsetOff, Notice(knownName ?: tr("Наушники", "Headphones"), null, ic(R.drawable.ios_headset), Tints.Gray,
+                        caption = tr("Отключено", "Disconnected"), deviceIcon = btIcon(device.address)))
                 }
             }
 
@@ -261,7 +273,11 @@ class SystemEvents(private val context: Context) {
                 val device = IntentCompat.getParcelableExtra(intent, BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
                     ?: return
                 val level = intent.getIntExtra(EXTRA_BT_BATTERY, -1)
-                if (level >= 0) headsetBattery[device.address] = level
+                if (level >= 0) {
+                    headsetBattery[device.address] = level
+                    val hs = IslandBus.headset.value
+                    if (hs != null && hs.address == device.address) IslandBus.headset.value = hs.copy(battery = level)
+                }
             }
 
             UsbManager.ACTION_USB_DEVICE_ATTACHED -> {
@@ -349,6 +365,20 @@ class SystemEvents(private val context: Context) {
             lowWarned = true
             notice(s.evLowBattery, Notice(tr("Низкий заряд", "Low Battery"), "$level%", ic(R.drawable.ios_battery_dead), Tints.Red, battery = level))
         }
+    }
+
+    /** Свой значок Bluetooth-устройства, если пользователь его загрузил. */
+    private fun btIcon(address: String): ImageBitmap? {
+        val file = java.io.File(context.filesDir, "bt_icons/${address.replace(":", "_")}.png")
+        if (!file.exists()) return null
+        return runCatching {
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeFile(file.absolutePath, bounds)
+            var sample = 1
+            while (bounds.outWidth / (sample * 2) >= 128) sample *= 2
+            val opts = BitmapFactory.Options().apply { inSampleSize = sample }
+            BitmapFactory.decodeFile(file.absolutePath, opts)?.asImageBitmap()
+        }.getOrNull()
     }
 
     private companion object {

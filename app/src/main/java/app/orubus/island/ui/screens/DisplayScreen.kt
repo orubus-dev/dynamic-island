@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.AspectRatio
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.BorderColor
 import androidx.compose.material.icons.rounded.ChatBubble
 import androidx.compose.material.icons.rounded.ColorLens
@@ -457,14 +458,16 @@ fun DisplayScreen(onBack: () -> Unit, open: (app.orubus.island.ui.Screen) -> Uni
         // ── APPEARANCE (остальное оформление) ──
         SectionHeader(tr("Оформление", "Appearance"))
         Group {
-            GroupItem(posOf(0, 4), Icons.Rounded.PhoneAndroid, tr("Калибровка", "Calibration"),
+            GroupItem(posOf(0, 5), Icons.Rounded.PhoneAndroid, tr("Калибровка", "Calibration"),
                 tr("Живая подгонка под камеру телефона", "Live fit under your phone's camera"), color = Tile.Gray) { open(app.orubus.island.ui.Screen.SIZE) }
-            GroupItem(posOf(1, 4), Icons.Rounded.RoundedCorner, tr("Размер с активностью", "Size with activity"),
+            GroupItem(posOf(1, 5), Icons.Rounded.RoundedCorner, tr("Размер с активностью", "Size with activity"),
                 null, color = Tile.Gray) { open(app.orubus.island.ui.Screen.LOOK) }
-            GroupItem(posOf(2, 4), Icons.Rounded.ColorLens, tr("Стекло и тень", "Color & glass"),
+            GroupItem(posOf(2, 5), Icons.Rounded.ColorLens, tr("Стекло и тень", "Color & glass"),
                 tr("Liquid Glass, прозрачность, тень", "Liquid Glass, opacity, shadow"), color = Tile.Gray) { open(app.orubus.island.ui.Screen.COLORS) }
-            GroupItem(posOf(3, 4), Icons.Rounded.ScreenRotation, tr("Анимации и эффекты", "Animations & effects"),
-                null, color = Tile.Gray) { open(app.orubus.island.ui.Screen.ANIM) }
+            GroupItem(posOf(3, 5), Icons.Rounded.ScreenRotation, tr("Анимации", "Animations"),
+                tr("Раскрытие, длительность, показ событий", "Expansion, duration, event display"), color = Tile.Gray) { open(app.orubus.island.ui.Screen.ANIM) }
+            GroupItem(posOf(4, 5), Icons.Rounded.AutoAwesome, tr("Эффекты", "Effects"),
+                tr("Размытие, эквалайзер, свечение, волны оплаты", "Blur, equalizer, glow, payment waves"), color = Tile.Gray) { open(app.orubus.island.ui.Screen.EFFECTS) }
         }
         Spacer(Modifier.height(8.dp))
         Text(

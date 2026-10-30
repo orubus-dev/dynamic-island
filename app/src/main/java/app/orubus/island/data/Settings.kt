@@ -296,6 +296,10 @@ data class IslandSettings(
     val swipeExpand: Boolean = true,
     /** Смахнул уведомление с острова — убрать его и в шторке */
     val swipeClearNotif: Boolean = false,
+    /** Раздельные жесты: слева — «Долгое нажатие», справа — ползунок громкости */
+    val longPressPartition: Boolean = true,
+    /** Долгое нажатие на правой половине и скольжение — ползунок громкости над островом */
+    val longPressVolume: Boolean = true,
 
     // Текст песен
     val lyricsEnabled: Boolean = true,
@@ -349,6 +353,12 @@ data class IslandSettings(
     val msgChannels: Map<String, String> = emptyMap(),
     /** Подсказку «Уведомления приходят дважды?» на главной убрали */
     val bannerHintHidden: Boolean = false,
+
+    // Bluetooth: свои значки устройств
+    /** Известные наушники: MAC → имя (для «Своих значков Bluetooth») */
+    val btKnown: Map<String, String> = emptyMap(),
+    /** Свои значки устройств: MAC → имя файла в filesDir/bt_icons */
+    val btIcons: Map<String, String> = emptyMap(),
 ) {
     /** С «Экономией заряда» в энергосбережении Android — как с «Уменьшить эффекты» */
     fun forPowerSave(on: Boolean): IslandSettings = if (on && batterySaver && !reduceEffects) copy(reduceEffects = true) else this

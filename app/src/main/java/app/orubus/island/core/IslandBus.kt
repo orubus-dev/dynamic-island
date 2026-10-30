@@ -76,6 +76,8 @@ object IslandBus {
     val camActive = MutableStateFlow(false)
     /** Точка доступа (хотспот) включена (PrivacyMonitor) */
     val hotspotOn = MutableStateFlow(false)
+    /** Подключённые наушники: имя, заряд, MAC — плеер показывает их в раскрытом острове */
+    val headset = MutableStateFlow<HeadsetInfo?>(null)
     /** На переднем плане игра — для игрового режима */
     val gameForeground = MutableStateFlow(false)
     /** Играет та самая песня — остров празднует (пасхалка, Egg.kt) */

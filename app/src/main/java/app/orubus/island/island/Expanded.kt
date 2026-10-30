@@ -57,6 +57,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.BluetoothAudio
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.HeartBroken
@@ -160,6 +161,24 @@ private fun MediaExpanded(m: MediaInfo, s: IslandSettings, lyrics: Lyrics?) {
                 if (m.artist.isNotBlank()) {
                     Spacer(Modifier.height(3.dp))
                     Text(m.artist, color = Tints.Gray, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                // Подключённые наушники: имя и заряд — как на iPhone рядом с плеером
+                val headset by IslandBus.headset.collectAsState()
+                headset?.let { hs ->
+                    if (!hs.name.isNullOrBlank()) {
+                        Spacer(Modifier.height(3.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Rounded.BluetoothAudio, null,
+                                tint = Tints.Gray, modifier = Modifier.size(13.dp),
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                hs.name + (hs.battery?.let { " · $it%" } ?: ""),
+                                color = Tints.Gray, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
                 }
             }
             Spacer(Modifier.width(10.dp))

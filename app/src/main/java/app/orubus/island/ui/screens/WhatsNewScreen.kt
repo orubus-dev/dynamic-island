@@ -28,9 +28,12 @@ import androidx.compose.material.icons.rounded.BlurOn
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Navigation
+import androidx.compose.material.icons.rounded.BluetoothAudio
+import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.SportsEsports
 import androidx.compose.material.icons.rounded.Swipe
 import androidx.compose.material.icons.rounded.TextFields
+import androidx.compose.material.icons.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.WifiTethering
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -115,6 +118,27 @@ private fun pages() = listOf(
         tr("Прячьте остров во время игр или оставляйте только важное. Полный контроль — в «Display».",
             "Hide the island during games or keep only what matters. Full control lives in Display."),
     ),
+    WhatsNewPage(
+        Icons.Rounded.VolumeUp, tr("Ползунок громкости", "Volume slider"),
+        tr("Долгое нажатие на правой половине острова и скольжение — громкость меняется прямо над экраном, с виброоткликом на каждый шаг.",
+            "Long-press the right half of the island and slide — volume changes right above the screen, with a haptic tick on every step."),
+    ),
+    WhatsNewPage(
+        Icons.Rounded.BluetoothAudio, tr("Bluetooth: свои значки", "Bluetooth: custom icons"),
+        tr("Наушники подключились — остров покажет их имя и заряд. Загрузите своё фото — оно станет значком в плашке и в плеере.",
+            "Headphones connected — the island shows their name and charge. Upload your own photo and it becomes the icon in the notice and the player."),
+        tr("Попробовать", "Try it now"),
+    ),
+    WhatsNewPage(
+        Icons.Rounded.Security, tr("Защита от пропусков", "Popup protection"),
+        tr("В «Разрешениях» теперь доктор: движок, слушатель уведомлений и батарея на одном экране. Скрипт wireless debugging из репозитория выдаёт всё за минуту.",
+            "Permissions now has a doctor: engine, notification listener and battery on one screen. The wireless-debugging script from the repo grants everything in a minute."),
+    ),
+    WhatsNewPage(
+        Icons.Rounded.Swipe, tr("Смахивание стало живым", "Swiping feels alive"),
+        tr("Плашка едет за пальцем, быстрый бросок тоже срабатывает, а смахнутое уведомление улетает за край экрана — влево, вправо или вверх.",
+            "The card follows your finger, fast flicks work too, and a swiped notification flies off the edge — left, right or up."),
+    ),
 )
 
 /** Экран «Что нового»: карусель страниц с точками и кнопкой «Попробовать». */
@@ -123,6 +147,7 @@ fun WhatsNewScreen(onBack: () -> Unit) {
     val list = pages()
     val pager = rememberPagerState(pageCount = { list.size })
     val scope = rememberCoroutineScope()
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     Page(tr("Что нового", "What's New"), onBack) {
         Box(
@@ -154,7 +179,7 @@ fun WhatsNewScreen(onBack: () -> Unit) {
                                 .clip(CircleShape)
                                 .background(Ui.Primary.copy(alpha = 0.14f))
                                 .border(1.dp, Ui.GlassHi, CircleShape)
-                                .clickable { tryIt(i) }
+                                .clickable { tryIt(context, i) }
                                 .padding(horizontal = 26.dp, vertical = 13.dp),
                         ) {
                             Text(p.tryLabel, color = Ui.Primary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
@@ -206,11 +231,20 @@ fun WhatsNewScreen(onBack: () -> Unit) {
     }
 }
 
-private fun tryIt(index: Int) {
+private fun tryIt(context: android.content.Context, index: Int) {
     when (index) {
         1 -> SettingsRepo.update { copy(keepAlive = true, autoHeal = true) }
         6 -> Controls.postDemoMessage()
         7 -> IslandBus.post(PrivacyMonitor.demoNotice())
+        11 -> IslandBus.post(
+            app.orubus.island.core.Notice(
+                tr("boAt Airdopes 141", "boAt Airdopes 141"), null,
+                app.orubus.island.island.Ios.load(context, app.orubus.island.R.drawable.ios_headset),
+                app.orubus.island.core.Tints.Green,
+                ring = 0.75f,
+                caption = tr("Подключено", "Connected"),
+            ),
+        )
     }
 }
 

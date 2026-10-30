@@ -6,6 +6,18 @@ Versioning: the second number (1.5, 1.6…) means new and changed features, the 
 
 > Since 1.6.1 the app and the island speak English (Features → General → Language). Earlier versions were in Russian only, so older entries give the Russian label in brackets.
 
+## [1.9.0] — 2026-10-30
+
+- 🔊 **Volume slider on the island** — long-press the right half of the island and slide: the island morphs into a slim volume bar right above your screen, with a haptic tick on every step. Left half keeps your long-press action ("Gestures" → Split gestures).
+- 🎧 **Bluetooth connectivity, upgraded** — headphones connect with their name and battery ring; the expanded player now shows the connected device, and you can upload your own photo as the device icon ("System Alerts" → Connections → Custom device icons).
+- 🛡️ **Popup protection** — the new "Popup protection" doctor in Permissions shows the engine, the notification listener, the battery whitelist and self-heal status on one screen, with a 2-minute wireless-debugging walkthrough and copyable commands.
+- 🛠️ **`tools/orubus-setup.sh` / `orubus-setup.bat`** — one script grants everything over wireless debugging (listener access, WRITE_SECURE_SETTINGS, battery whitelist, all runtime permissions) and verifies each step, so nothing is ever missed.
+- 👆 **Swiping feels alive** — cards follow your finger, fast flicks count, horizontal and vertical gestures lock instantly, and a swiped notification flies off the edge instead of vanishing (works left, right and up).
+- 📶 **Hotspot that actually works** — detection now uses the system TetheringManager (Android 11+) instead of guessing interface names, so the notice fires the moment your hotspot starts; USB tethering covered too. Try it in "Try it".
+- 🧭 **Navigation rebuilt** — the back stack survives process death and rotation, unknown routes fail safe, Liquid Glass / Effects screens are reachable again (Display → Appearance), and the dead Appearance screen is gone.
+- ✨ **Refraction dock** — the floating dock is real layered glass: lens gradient, chromatic edge fringe, a slow sheen sweep and press feedback.
+- ⚙️ **Settings, organized** — check-for-updates, what's-new, GitHub repo and the privacy policy all live on the Settings tab, pointing at github.com/orubus-dev/dynamic-island.
+
 ## [1.8.0] — 2026-10-30
 
 - 🫧 **Liquid Glass Monochrome** — the whole app is now a black-and-white glass UI: glass panels with a soft sheen, a floating dock at the bottom (Home on the left, Settings on the right) and big category cards.

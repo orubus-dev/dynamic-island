@@ -1,10 +1,12 @@
 package app.orubus.island.ui.screens
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CallSplit
 import androidx.compose.material.icons.rounded.PanTool
 import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.TouchApp
+import androidx.compose.material.icons.rounded.VolumeUp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -39,8 +41,24 @@ fun GesturesScreen(onBack: () -> Unit) {
                 onClick = { dialog = Which.TAP }, color = Tile.Blue)
             GroupItem(Pos.Middle, Icons.Rounded.TouchApp, tr("Двойное нажатие", "Double tap"), s.doubleTapAction.title,
                 onClick = { dialog = Which.DOUBLE }, color = Tile.Indigo)
-            GroupItem(Pos.Last, Icons.Rounded.PanTool, tr("Долгое нажатие", "Long press"), s.longPressAction.title,
+            GroupItem(Pos.Last, Icons.Rounded.PanTool, tr("Долгое нажатие", "Long press"),
+                if (s.longPressPartition) tr("Левая половина острова", "Left half of the island") else s.longPressAction.title,
                 onClick = { dialog = Which.LONG }, color = Tile.Orange)
+        }
+
+        SectionHeader(tr("Раздельные жесты", "Split gestures"))
+        Group {
+            GroupToggle(Pos.First, Icons.Rounded.CallSplit, tr("Разделить по половинам", "Left / right partition"),
+                tr("Слева — «Долгое нажатие», справа — ползунок громкости", "Left half — the long-press action, right half — the volume slider"),
+                s.longPressPartition, color = Tile.Teal) { v ->
+                SettingsRepo.update { copy(longPressPartition = v) }
+            }
+            GroupToggle(Pos.Last, Icons.Rounded.VolumeUp, tr("Ползунок громкости", "Volume slider"),
+                tr("Долгое нажатие на правой половине и скольжение — громкость над островом",
+                    "Long-press the right half and slide — volume above the island"),
+                s.longPressVolume, color = Tile.Green) { v ->
+                SettingsRepo.update { copy(longPressVolume = v) }
+            }
         }
         SectionHeader(tr("Свайпы", "Swipes"))
         Group {

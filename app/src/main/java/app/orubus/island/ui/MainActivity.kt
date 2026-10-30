@@ -68,7 +68,7 @@ import app.orubus.island.ui.screens.AppInfoScreen
 import app.orubus.island.ui.screens.BannersScreen
 import app.orubus.island.ui.screens.BanksScreen
 import app.orubus.island.ui.screens.BehaviorScreen
-import app.orubus.island.ui.screens.CapsuleScreen
+import app.orubus.island.ui.screens.BluetoothScreen
 import app.orubus.island.ui.screens.CardsScreen
 import app.orubus.island.ui.screens.ColorsScreen
 import app.orubus.island.ui.screens.DiagScreen
@@ -95,7 +95,7 @@ import app.orubus.island.update.UpdateChecker
 
 enum class Screen {
     CARDS, EVENTS, GESTURES, LYRICS, SIZE, COLORS, INSTRUCTION, ABOUT, DIAG, LOOK, ANIM, EFFECTS, BANNERS,
-    PERMISSIONS, TESTS, NOTIFICATIONS, BEHAVIOR, PAYDIAG, KEEPALIVE, BANKS, DISPLAY, WHATSNEW, PRIVACY, FEATURES,
+    PERMISSIONS, TESTS, NOTIFICATIONS, BEHAVIOR, PAYDIAG, KEEPALIVE, BANKS, DISPLAY, WHATSNEW, PRIVACY, FEATURES, BT,
 }
 
 class MainActivity : ComponentActivity() {
@@ -119,17 +119,19 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun AppRoot() {
     var tab by rememberSaveable { mutableIntStateOf(0) }
-    var stack by remember { mutableStateOf(listOf<Screen>()) }
-    var forward by remember { mutableStateOf(true) }
+    // Стек экранов сохраняется: поворот экрана и смерть процесса не сбрасывают навигацию
+    var stackNames by rememberSaveable { mutableStateOf(listOf<String>()) }
+    var forward by rememberSaveable { mutableStateOf(true) }
+    val stack = remember(stackNames) { stackNames.mapNotNull { n -> runCatching { Screen.valueOf(n) }.getOrNull() } }
     val open: (Screen) -> Unit = {
         forward = true
-        stack = stack + it
+        stackNames = stackNames + it.name
     }
     val back: () -> Unit = {
         forward = false
-        stack = stack.dropLast(1)
+        stackNames = stackNames.dropLast(1)
     }
-    BackHandler(enabled = stack.isNotEmpty(), onBack = back)
+    BackHandler(enabled = stackNames.isNotEmpty(), onBack = back)
 
     // Раз в 3 часа спрашиваем GitHub, не вышла ли новая версия; после обновления — «Что нового»
     val context = LocalContext.current
@@ -139,7 +141,7 @@ private fun AppRoot() {
         WhatsNewDialog()
 
         Box(Modifier.fillMaxSize().background(Ui.Bg)) {
-            val key = stack.lastOrNull()?.name ?: "tab$tab"
+            val key = stackNames.lastOrNull() ?: "tab$tab"
             AnimatedContent(
                 targetState = key,
                 transitionSpec = {
@@ -157,7 +159,7 @@ private fun AppRoot() {
                     "tab0" -> HomeScreen(open)
                     "tab1" -> AppInfoScreen(open)
                     Screen.DISPLAY.name -> DisplayScreen(back, open)
-                    Screen.EVENTS.name -> SystemAlertsScreen(back)
+                    Screen.EVENTS.name -> SystemAlertsScreen(back, open)
                     Screen.WHATSNEW.name -> WhatsNewScreen(back)
                     Screen.PRIVACY.name -> PrivacyScreen(back)
                     Screen.FEATURES.name -> FeaturesScreen(open)
@@ -180,75 +182,22 @@ private fun AppRoot() {
                     Screen.TESTS.name -> TestsScreen(back)
                     Screen.NOTIFICATIONS.name -> NotificationsScreen(back)
                     Screen.BEHAVIOR.name -> BehaviorScreen(back)
+                    Screen.BT.name -> BluetoothScreen(back)
+                    // Неизвестный ключ (например, экран из старой версии) — пустой слой, не падаем
+                    else -> Box(Modifier.fillMaxSize())
                 }
             }
 
             AnimatedVisibility(
-                visible = stack.isEmpty(),
+                visible = stackNames.isEmpty(),
                 enter = slideInVertically { it } + fadeIn(),
                 exit = slideOutVertically { it } + fadeOut(),
                 modifier = Modifier.align(Alignment.BottomCenter),
             ) {
-                BottomBar(tab) { tab = it }
+                RefractionDock(tab) { tab = it }
             }
         }
     }
 }
 
-/** Плавающий стеклянный док: главная слева, настройки справа. */
-private fun tabTitles() = listOf(tr("Главная", "Home"), tr("Настройки", "Settings"))
-
-@Composable
-private fun BottomBar(selected: Int, onSelect: (Int) -> Unit) {
-    val icons = listOf(
-        ImageVector.vectorResource(R.drawable.ic_tab_island),
-        Icons.Rounded.Settings,
-    )
-    Row(
-        Modifier
-            .navigationBarsPadding()
-            .fillMaxWidth()
-            .padding(horizontal = 40.dp, vertical = 12.dp)
-            .shadow(18.dp, RoundedCornerShape(32.dp))
-            .glassCard(RoundedCornerShape(32.dp))
-            .padding(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        tabTitles().forEachIndexed { i, title ->
-            val on = i == selected
-            val pill by animateColorAsState(if (on) Ui.Primary else androidx.compose.ui.graphics.Color.Transparent, tween(220), label = "dock")
-            Row(
-                Modifier
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(pill)
-                    .clickable { onSelect(i) }
-                    .padding(horizontal = 22.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Icon(icons[i], title, tint = if (on) Ui.OnPrimary else Ui.Text, modifier = Modifier.size(22.dp))
-                TabLabel(title, if (on) Ui.OnPrimary else Ui.Sub, on)
-            }
-        }
-    }
-}
-
-/** Подпись вкладки: если не влезает (крупный шрифт Android), чуть уменьшается, а не обрезается. */
-@Composable
-private fun TabLabel(text: String, color: androidx.compose.ui.graphics.Color, bold: Boolean) {
-    val measurer = rememberTextMeasurer()
-    val base = LocalTextStyle.current
-    val weight = if (bold) FontWeight.SemiBold else FontWeight.Medium
-    BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = 2.dp), contentAlignment = Alignment.Center) {
-        val room = constraints.maxWidth
-        val size = remember(text, room, weight) {
-            var sz = 12f
-            while (sz > 8f && measurer.measure(text, base.copy(fontSize = sz.sp, fontWeight = weight), maxLines = 1).size.width > room) {
-                sz -= 0.5f
-            }
-            sz.sp
-        }
-        Text(text, color = color, fontSize = size, fontWeight = weight, maxLines = 1, softWrap = false, style = base)
-    }
-}
+/** Плавающий док перенесён в Dock.kt — жидкое стекло с преломлением. */

@@ -464,7 +464,16 @@ private fun WideNotice(n: Notice, s: IslandSettings, wideWidth: Dp) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-            Icon(n.icon, null, tint = n.tint, modifier = Modifier.size(height * 0.355f).scale(pop.value))
+            // Свой значок Bluetooth-устройства вместо стандартного
+            val device = n.deviceIcon
+            if (device != null) {
+                Image(
+                    device, null,
+                    Modifier.size(height * 0.42f).clip(CircleShape).scale(pop.value),
+                )
+            } else {
+                Icon(n.icon, null, tint = n.tint, modifier = Modifier.size(height * 0.355f).scale(pop.value))
+            }
             Spacer(Modifier.width(9.dp))
             // «Не беспокоить», «Режим полёта» не влезают до камеры — шрифт чуть меньше, а не многоточие
             FitText(n.title, fg, 17.sp * tScale, 13.sp * tScale, FontWeight.SemiBold, Modifier.weight(1f, fill = false), style = Digits.copy(fontFamily = tf))

@@ -46,7 +46,6 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -55,6 +54,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -64,6 +64,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -85,10 +86,12 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.orubus.island.core.BatteryInfo
@@ -110,7 +113,6 @@ import app.orubus.island.service.NotifListener
 import app.orubus.island.service.PayMonitor
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.math.abs
 import kotlin.math.sqrt
 
 /** Пример активности для подбора ширины: стрелка направо и «300 м». */
@@ -472,7 +474,17 @@ private fun IslandBody(
     // Раскрытый остров iPhone — 371 pt при ширине экрана 393 pt, то есть по 11 с каждой стороны.
     // «Максимальная ширина» из настроек ограничивает, насколько широко он раскрывается
     val expandedWidth = ((conf.screenWidthDp.dp - 22.dp) * (s.maxWidthPct / 100f)).coerceAtMost(460.dp)
+    // Ползунок громкости чуть уже раскрытого острова
+    val volumeWidth = (expandedWidth - 22.dp).coerceAtLeast(200.dp)
     val h = s.height.dp
+
+    // Смещение карточки под пальцем (свайпы), ползунок громкости (долгое нажатие справа)
+    // и ширина острова в px — для разделения «нажатие / громкость» по половинам
+    val swipe = remember { SwipeState() }
+    val volumeMode = IslandVolume.mode
+    var bodyW by remember { mutableIntStateOf(0) }
+    val volumeStepPx = with(LocalDensity.current) { 52.dp.toPx() }
+    DisposableEffect(context) { IslandVolume.attach(context); onDispose { } }
 
     // Скругления из настроек: «малый радиус» — для капсулы, «большой» — для раскрытого и плашек.
     // Радиус капсулы не больше половины высоты, иначе углы обрежутся некрасиво
@@ -480,6 +492,7 @@ private fun IslandBody(
     val bigR = s.radiusBig.dp
     // Скругления — как в ролике: плеер и фонарик 46, навигатор 42, обновление 36, уведомление 32
     val cornerTarget = when {
+        volumeMode -> smallR.coerceAtMost(h / 2)
         expanded && (primary is Act.MediaA || primary is Act.TorchA) -> bigR
         expanded && primary is Act.LiveA -> bigR
         expanded -> bigR
@@ -567,6 +580,7 @@ private fun IslandBody(
     Box(
         Modifier
             .onGloballyPositioned { onBounds(it.boundsInWindow()) }
+            .onSizeChanged { bodyW = it.width }
             .graphicsLayer {
                 // Пасхалка: остров подпрыгивает в такт песни; оплата прошла — на миг подрастает
                 val bump = Egg.bump() * PayFx.pop.floatValue
@@ -574,6 +588,12 @@ private fun IslandBody(
                 scaleY = jellyY.value * (1f + 0.08f * pull.value) * bump
                 translationX = shake.value.dp.toPx()
                 transformOrigin = TransformOrigin(0.5f, 0f)
+                // Карточка едет за пальцем при свайпе — только у свёрнутого острова
+                if (!expanded) {
+                    translationX += swipe.x.floatValue
+                    translationY += swipe.y.floatValue
+                    alpha = swipe.alpha.floatValue
+                }
             }
             .then(if (glowAlpha > 0f) Modifier.drawBehind { islandGlow(glowTint, glowAlpha, corner.value.toPx(), s.notch) } else Modifier)
             // Тень и обрезка по форме — одним слоем; форма на каждом кадре берётся из анимации скругления
@@ -622,7 +642,7 @@ private fun IslandBody(
                     }
                 }
             }
-            .pointerInput(s.doubleTapAction != TapAction.NOTHING, s.longPressAction != TapAction.NOTHING) {
+            .pointerInput(s.doubleTapAction != TapAction.NOTHING, s.longPressAction != TapAction.NOTHING, s.longPressPartition, s.longPressVolume) {
                 val doubleOn = settings.doubleTapAction != TapAction.NOTHING
                 val longOn = settings.longPressAction != TapAction.NOTHING
                 val onDouble: ((Offset) -> Unit)? = if (!doubleOn) null else {
@@ -632,9 +652,14 @@ private fun IslandBody(
                     }
                 }
                 val onLong: ((Offset) -> Unit)? = if (!longOn) null else {
-                    { _: Offset ->
-                        haptic()
-                        perform(context, settings.longPressAction, current)
+                    { pos: Offset ->
+                        // Правая половина и включён ползунок громкости — там громкость, а не действие
+                        val volumeTakesIt = settings.longPressPartition && settings.longPressVolume &&
+                            !isExpanded && pos.x >= size.width / 2f
+                        if (!volumeTakesIt) {
+                            haptic()
+                            perform(context, settings.longPressAction, current)
+                        }
                     }
                 }
                 detectTapGestures(
@@ -646,63 +671,84 @@ private fun IslandBody(
                     onLongPress = onLong,
                 )
             }
-            .pointerInput(Unit) {
-                val threshold = 36.dp.toPx()
-                val side = 56.dp.toPx()
-                var dx = 0f
-                var dy = 0f
-                detectDragGestures(
-                    onDragStart = {
-                        dx = 0f
-                        dy = 0f
-                    },
-                    onDragEnd = {
-                        scope.launch { pull.animateTo(0f, spring(dampingRatio = 0.45f)) }
-                        val vertical = abs(dy) > abs(dx)
-                        val act = current
-                        when {
-                            !isExpanded && vertical && dy > threshold && settings.swipeExpand && !act.transient &&
-                                (act !is Act.Idle || settings.idleExpand) -> {
-                                haptic()
-                                Controls.expand(act.id)
-                            }
-                            isExpanded && vertical && dy < -threshold -> {
-                                haptic()
-                                Controls.collapse()
-                            }
-                            // Смахнуть уведомление вверх, как баннер на iPhone. Порог полный, чтобы палец,
-                            // чуть съехавший при нажатии «Ответить», не убирал плашку.
-                            // Со «Смахнул — значит убрать» уведомление уходит и из шторки
-                            !isExpanded && vertical && dy < -threshold && act is Act.NoticeA -> {
-                                if (settings.swipeClearNotif) act.n.message?.key?.let { NotifListener.cancelKey(it) }
-                                IslandBus.notice.value = null
-                            }
-                            // Подсказку оплаты тоже можно смахнуть
-                            !isExpanded && vertical && dy < -threshold && act is Act.PayA -> PayMonitor.clearReady()
-                            // И входящий звонок, если не хочется отвечать: звонок идёт дальше, но остров свободен
-                            !isExpanded && vertical && dy < -threshold && act is Act.CallA && act.c.incoming -> {
-                                haptic()
-                                Controls.hideIncomingCall()
-                            }
-                            !isExpanded && !vertical && abs(dx) > side && act is Act.MediaA && settings.swipeTracks -> {
-                                haptic()
-                                // Как в ПК-версии: толкнуть влево — следующий трек
-                                if (dx < 0) Controls.next() else Controls.prev()
-                            }
+            // Долгое нажатие на правой половине и скольжение — ползунок громкости над островом
+            .volumeSlide(
+                accept = { pos ->
+                    settings.longPressPartition && settings.longPressVolume && !isExpanded && !IslandVolume.mode &&
+                        pos.x >= bodyW / 2f
+                },
+                onBegin = {
+                    haptic()
+                    IslandVolume.begin()
+                },
+                onDelta = { dx, dy -> IslandVolume.drag(dx, dy, volumeStepPx) },
+                onEnd = { IslandVolume.end() },
+            )
+            .islandSwipe(
+                state = swipe,
+                caps = {
+                    val act = current
+                    SwipeCaps(
+                        canExpand = !isExpanded && settings.swipeExpand && !act.transient && (act !is Act.Idle || settings.idleExpand),
+                        canCollapse = isExpanded,
+                        canDismiss = !isExpanded && (act is Act.NoticeA || act is Act.PayA || (act is Act.CallA && act.c.incoming)),
+                        canTracks = !isExpanded && act is Act.MediaA && settings.swipeTracks,
+                    )
+                },
+                onPull = { f -> scope.launch { pull.snapTo(f) } },
+                onPullEnd = { scope.launch { pull.animateTo(0f, spring(dampingRatio = 0.45f)) } },
+                onExpand = {
+                    haptic()
+                    Controls.expand(current.id)
+                },
+                onCollapse = {
+                    haptic()
+                    Controls.collapse()
+                },
+                onDismiss = {
+                    val act = current
+                    when (act) {
+                        // Со «Смахнул — значит убрать» уведомление уходит и из шторки
+                        is Act.NoticeA -> {
+                            if (settings.swipeClearNotif) act.n.message?.key?.let { NotifListener.cancelKey(it) }
+                            IslandBus.notice.value = null
                         }
-                    },
-                    onDragCancel = { scope.launch { pull.animateTo(0f) } },
-                    onDrag = { change, amount ->
-                        change.consume()
-                        dx += amount.x
-                        dy += amount.y
-                        if (!isExpanded && settings.swipeExpand) {
-                            scope.launch { pull.snapTo((dy / (threshold * 3)).coerceIn(0f, 1f)) }
+                        // Подсказку оплаты тоже можно смахнуть
+                        is Act.PayA -> PayMonitor.clearReady()
+                        // И входящий звонок, если не хочется отвечать: звонок идёт дальше, но остров свободен
+                        is Act.CallA -> if (act.c.incoming) {
+                            haptic()
+                            Controls.hideIncomingCall()
                         }
-                    },
-                )
-            },
+                        else -> Unit
+                    }
+                    swipe.reset()
+                },
+                onTracks = { next ->
+                    haptic()
+                    // Как в ПК-версии: толкнуть влево — следующий трек
+                    if (next) Controls.next() else Controls.prev()
+                },
+            ),
     ) {
+        // Ползунок громкости живёт вместо содержимого: остров превращается в широкую пилюлю
+        AnimatedContent(
+            targetState = volumeMode,
+            contentKey = { it },
+            transitionSpec = {
+                ((fadeIn(tween(130)) + scaleIn(islandSpec(s), initialScale = 0.86f, transformOrigin = TransformOrigin(0.5f, 0f))) togetherWith
+                    (fadeOut(tween(120)) + scaleOut(islandSpec(s), targetScale = 0.86f, transformOrigin = TransformOrigin(0.5f, 0f))))
+                    .using(SizeTransform(clip = true) { _, _ -> islandSpec(s) })
+            },
+            label = "volume",
+        ) { vol ->
+            if (vol) {
+                VolumeBarContent(
+                    modifier = Modifier.width(volumeWidth),
+                    tint = Color.White,
+                    onTick = { if (s.haptics) haptic() },
+                )
+            } else {
         // Смена содержимого: с «Жидким раскрытием» новое вырастает из прежнего вместе с формой острова,
         // без него — прежнее перетекание. Форма в обоих случаях меняется пружиной из «Раскрытия острова»
         val widths = remember { HashMap<String, Int>() }
@@ -721,6 +767,8 @@ private fun IslandBody(
                 } else {
                     CompactContent(f.act, s, expandedWidth)
                 }
+            }
+        }
             }
         }
     }

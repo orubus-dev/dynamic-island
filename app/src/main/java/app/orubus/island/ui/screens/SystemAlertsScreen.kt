@@ -22,6 +22,7 @@ import androidx.compose.material.icons.rounded.AirplanemodeInactive
 import androidx.compose.material.icons.rounded.Alarm
 import androidx.compose.material.icons.rounded.BatteryAlert
 import androidx.compose.material.icons.rounded.BluetoothConnected
+import androidx.compose.material.icons.rounded.Bluetooth
 import androidx.compose.material.icons.rounded.BluetoothDisabled
 import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.BrightnessAuto
@@ -61,9 +62,11 @@ import app.orubus.island.data.FaceStyle
 import app.orubus.island.data.IslandSettings
 import app.orubus.island.data.SettingsRepo
 import app.orubus.island.ui.Group
+import app.orubus.island.ui.GroupItem
 import app.orubus.island.ui.GroupToggle
 import app.orubus.island.ui.Page
 import app.orubus.island.ui.Pos
+import app.orubus.island.ui.Screen
 import app.orubus.island.ui.RadioDot
 import app.orubus.island.ui.SectionHeader
 import app.orubus.island.ui.Tile
@@ -73,7 +76,7 @@ import app.orubus.island.ui.publicShape
 
 /** «Системные оповещения»: живые события и приватность — по разделам. */
 @Composable
-fun SystemAlertsScreen(onBack: () -> Unit) {
+fun SystemAlertsScreen(onBack: () -> Unit, open: (Screen) -> Unit) {
     val s by SettingsRepo.state.collectAsState()
     fun set(block: IslandSettings.() -> IslandSettings) = SettingsRepo.update(block)
 
@@ -160,8 +163,11 @@ fun SystemAlertsScreen(onBack: () -> Unit) {
                 s.evHeadsetOff, color = Tile.Gray) { set { copy(evHeadsetOff = it) } }
             GroupToggle(Pos.Middle, Icons.Rounded.Usb, tr("USB-устройство подключено", "USB device connected"), null,
                 s.evUsbOn, color = Tile.Gray) { set { copy(evUsbOn = it) } }
-            GroupToggle(Pos.Last, Icons.Rounded.UsbOff, tr("USB-устройство отключено", "USB device disconnected"), null,
+            GroupToggle(Pos.Middle, Icons.Rounded.UsbOff, tr("USB-устройство отключено", "USB device disconnected"), null,
                 s.evUsbOff, color = Tile.Gray) { set { copy(evUsbOff = it) } }
+            GroupItem(Pos.Last, Icons.Rounded.Bluetooth, tr("Свои значки устройств", "Custom device icons"),
+                tr("Своё фото для наушников в плашке и плеере", "Your own photo for headphones in the notice and player"),
+                onClick = { open(Screen.BT) }, color = Tile.Gray, badge = if (s.btIcons.isEmpty()) null else tr("Есть", "Set")) { Arrow() }
         }
 
         SectionHeader(tr("Режимы", "Modes"))
