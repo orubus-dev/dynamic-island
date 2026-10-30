@@ -235,6 +235,10 @@ object NotificationParser {
         if (key in IslandBus.chrono.value) IslandBus.chrono.value = IslandBus.chrono.value - key
         if (key in IslandBus.live.value) IslandBus.live.value = IslandBus.live.value - key
         if (key in IslandBus.ringingAlarms.value) IslandBus.ringingAlarms.value = IslandBus.ringingAlarms.value - key
+        // «Живая очистка»: уведомление убрали из шторки — его плашка в острове уходит сразу,
+        // а не висит по таймеру (например, когда пользователь смахнул его в шторке)
+        val shown = IslandBus.notice.value ?: return
+        if (shown.message?.key == key && !IslandBus.noticeHold.value) IslandBus.notice.value = null
     }
 
     fun icon(context: Context, pkg: String): ImageBitmap? = icons.getOrPut(pkg) {

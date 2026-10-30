@@ -1,8 +1,8 @@
-### Bigger, smarter, quieter
-Expanded notch height editing, theme presets (Noir/Graphite/Snow/Frost), your own emoji in the capsule, live network speed and the current lyric line.
+### Popup shield with built-in adb
+System heads-up banners turn off in one tap, and the built-in adb (Shizuku-style) connects to debugging and runs the shield commands by itself.
 
-### New events
-Screenshots get noticed, VPN on/off, dark theme and auto-rotate changes — plus privacy pills that call the app by name (camera now works reliably, via AppOps).
+### Camera, dock and "Unlocked"
+The camera got its own pulsing green animation, the Settings icon is back in the dock, and Face Unlock shows the whole "Unlocked" — no more "Unloc".
 
-### Wellbeing
-Flip to shhh (face down = Do Not Disturb), break reminders, quiet hours — and a frosted blur on every state change. Navigation and the dock are fixed too.
+### Millisecond duplicate shield
+A repeat banner within 900 ms dies instantly; after a swiped banner the island dives into the notch and springs right back.

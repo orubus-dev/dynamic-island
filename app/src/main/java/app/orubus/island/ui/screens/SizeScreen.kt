@@ -14,6 +14,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.OpenInFull
+import androidx.compose.material.icons.rounded.RoundedCorner
+import androidx.compose.material.icons.rounded.AspectRatio
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Height
 import androidx.compose.material.icons.rounded.Restore
@@ -118,6 +121,31 @@ fun SizeScreen(onBack: () -> Unit) {
                     set { copy(height = v) }
                 }
             }
+
+            // Раскрытый остров: своя высота, углы и ширина — «форма и размер большого острова»
+            Spacer(Modifier.height(16.dp))
+            Group {
+                GroupStepSlider(
+                    Pos.First, Icons.Rounded.OpenInFull, tr("Раскрытый: высота", "Expanded: height"),
+                    s.bigHeight, 80..180, unit = "%", color = Tile.Blue,
+                ) { v -> set { copy(bigHeight = v) } }
+                GroupStepSlider(
+                    Pos.Middle, Icons.Rounded.RoundedCorner, tr("Раскрытый: углы", "Expanded: corners"),
+                    s.radiusBig, 12..56, color = Tile.Indigo,
+                ) { v -> set { copy(radiusBig = v) } }
+                GroupStepSlider(
+                    Pos.Last, Icons.Rounded.AspectRatio, tr("Раскрытый: ширина", "Expanded: width"),
+                    s.maxWidthPct, 60..100, unit = "%", color = Tile.Teal,
+                ) { v -> set { copy(maxWidthPct = v) } }
+            }
+            Text(
+                tr(
+                    "Форма и размер раскрытого острова: высота плашек в процентах, скругление больших углов и до какой ширины экрана раскрывается",
+                    "Shape and size of the expanded island: notice height in percent, the big corner radius and how far across the screen it opens",
+                ),
+                color = Ui.Sub.copy(alpha = 0.7f), fontSize = 12.sp,
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 8.dp),
+            )
         }
 
         Row(
@@ -141,4 +169,7 @@ fun SizeScreen(onBack: () -> Unit) {
 
 /** Всё, что настраивается на этом экране, — из [from]: для «назад» и «Сбросить». */
 private fun IslandSettings.withPlacement(from: IslandSettings) =
-    copy(offsetX = from.offsetX, offsetY = from.offsetY, width = from.width, height = from.height, notch = from.notch)
+    copy(
+        offsetX = from.offsetX, offsetY = from.offsetY, width = from.width, height = from.height, notch = from.notch,
+        bigHeight = from.bigHeight, radiusBig = from.radiusBig, maxWidthPct = from.maxWidthPct,
+    )

@@ -3,7 +3,9 @@ package app.orubus.island.service
 import android.app.KeyguardManager
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.BatterySaver
 import androidx.compose.material.icons.rounded.Face
+import androidx.compose.material.icons.rounded.Headset
 import android.app.NotificationManager
 import android.bluetooth.BluetoothClass
 import android.bluetooth.BluetoothDevice
@@ -71,6 +73,8 @@ class SystemEvents(private val context: Context) {
     private val wifiNetworks = HashSet<Network>()
     /** Когда подключили или отключили зарядку — кабель от компьютера не должен давать вторую плашку «USB» */
     private var lastPowerChange = 0L
+    /** Батарея была полна: «Заряжено» показываем один раз за зарядку */
+    private var fullAnnounced = false
 
     // ── 1.10: VPN, тёмная тема, автоповорот, скриншоты, «переверни, чтобы тихо», «пора отдохнуть» ──
     private var vpnOn: Boolean? = null
@@ -195,6 +199,7 @@ class SystemEvents(private val context: Context) {
             addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED)
             addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
             addAction(USB_STATE)
+            addAction(Intent.ACTION_HEADSET_PLUG)
             addAction(NotificationManager.ACTION_INTERRUPTION_FILTER_CHANGED)
             addAction(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED)
             addAction(Intent.ACTION_CONFIGURATION_CHANGED)
@@ -310,8 +315,17 @@ class SystemEvents(private val context: Context) {
 
             Intent.ACTION_CONFIGURATION_CHANGED -> themeChanged()
 
-            PowerManager.ACTION_POWER_SAVE_MODE_CHANGED ->
+            Intent.ACTION_HEADSET_PLUG -> onWiredHeadset(intent, initialSticky)
+
+            PowerManager.ACTION_POWER_SAVE_MODE_CHANGED -> {
                 IslandBus.powerSave.value = context.getSystemService(PowerManager::class.java)?.isPowerSaveMode == true
+                val on = IslandBus.powerSave.value
+                notice(
+                    s.evPowerSave,
+                    Notice(tr("Энергосбережение", "Battery Saver"), if (on) tr("Вкл", "On") else tr("Выкл", "Off"),
+                        Icons.Rounded.BatterySaver, if (on) Tints.Yellow else Tints.Gray),
+                )
+            }
 
             NotificationManager.ACTION_INTERRUPTION_FILTER_CHANGED -> {
                 val on = isDnd()
@@ -414,6 +428,21 @@ class SystemEvents(private val context: Context) {
                 }, 1500)
             }
         }
+    }
+
+    /** Проводные наушники: системное сообщение приходит и как липкое — при запуске его пропускаем */
+    private fun onWiredHeadset(intent: Intent, initialSticky: Boolean) {
+        if (initialSticky) return
+        val plugged = intent.getIntExtra("state", 0) == 1
+        notice(
+            s.evWired,
+            Notice(
+                tr("Проводные наушники", "Wired headphones"),
+                if (plugged) tr("Подключены", "Connected") else tr("Отключены", "Disconnected"),
+                Icons.Rounded.Headset,
+                if (plugged) Tints.Green else Tints.Gray,
+            ),
+        )
     }
 
     private var lastUnlock = 0L
@@ -595,6 +624,14 @@ class SystemEvents(private val context: Context) {
             (status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL)
         IslandBus.battery.value = BatteryInfo(level, charging)
 
+        if (charging && level >= 100) {
+            if (!fullAnnounced) {
+                fullAnnounced = true
+                notice(s.evCharged, Notice(tr("Заряжено", "Charged"), "100%", ic(R.drawable.ios_battery_full), Tints.Green, battery = 100))
+            }
+        } else {
+            fullAnnounced = false
+        }
         if (charging || level > 5) {
             lowWarned = false
         } else if (level >= 0 && !lowWarned) {

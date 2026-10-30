@@ -8,6 +8,7 @@ import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Transition
 import androidx.compose.animation.core.updateTransition
@@ -354,6 +355,20 @@ fun IslandOverlay(
     }
     val hiddenNow = rememberUpdatedState(hidden)
 
+    // После смахнутой последней плашки остров ныряет в вырез и тут же выпрыгивает обратно —
+    // «пружинка из-под камеры» вместо внезапной смены на пустую капсулу
+    var popHide by remember { mutableStateOf(false) }
+    LaunchedEffect(primary.id) {
+        val at = IslandBus.notchPopAt
+        if (at == 0L) return@LaunchedEffect
+        IslandBus.notchPopAt = 0L
+        if (primary !is Act.Idle || s.reduceEffects) return@LaunchedEffect
+        if (SystemClock.elapsedRealtime() - at > 1500) return@LaunchedEffect
+        popHide = true
+        delay(320)
+        popHide = false
+    }
+
     // Где остров в окне — вокруг него рисуются эффекты пасхалки
     val body = remember { mutableStateOf(Rect.Zero) }
     val onBody = remember(onBodyBounds) {
@@ -374,7 +389,7 @@ fun IslandOverlay(
         // «Скрывать пустой остров»: он не пропадает рывком, а уходит в камеру и выходит из неё
         val top = TransformOrigin(0.5f, 0f)
         AnimatedVisibility(
-            !hidden,
+            !hidden && !popHide,
             enter = if (s.reduceEffects) fadeIn() else scaleIn(islandSpec(s), initialScale = 0.3f, transformOrigin = top) + fadeIn(tween(120)),
             exit = if (s.reduceEffects) fadeOut() else scaleOut(islandSpec(s), targetScale = 0.3f, transformOrigin = top) + fadeOut(tween(160)),
         ) {
@@ -565,11 +580,12 @@ private fun IslandBody(
         sheen.snapTo(-1f)
     }
 
-    // Морозное стекло при смене состояния: содержимое на миг размывается и проявляется обратно
+    // Морозное стекло при смене состояния: содержимое на миг размывается и проявляется обратно.
+    // «Морозный переход» в «Эффектах» управляет этой дымкой; с Liquid Glass дымка гуще
     val frost = remember { Animatable(0f) }
     LaunchedEffect(primary.id, expanded) {
-        if (!s.fxBlur || s.reduceEffects) return@LaunchedEffect
-        frost.snapTo(1f)
+        if (!s.fxBlur || !s.fxFrost || s.reduceEffects) return@LaunchedEffect
+        frost.snapTo(if (s.liquidGlass) 1.2f else 1f)
         frost.animateTo(0f, tween(320, easing = FastOutSlowInEasing))
     }
 
@@ -721,13 +737,19 @@ private fun IslandBody(
                         is Act.NoticeA -> {
                             if (settings.swipeClearNotif) act.n.message?.key?.let { NotifListener.cancelKey(it) }
                             IslandBus.notice.value = null
+                            // Пустому острову после смахнутой плашки — выход из-под камеры
+                            IslandBus.notchPopAt = SystemClock.elapsedRealtime()
                         }
                         // Подсказку оплаты тоже можно смахнуть
-                        is Act.PayA -> PayMonitor.clearReady()
+                        is Act.PayA -> {
+                            PayMonitor.clearReady()
+                            IslandBus.notchPopAt = SystemClock.elapsedRealtime()
+                        }
                         // И входящий звонок, если не хочется отвечать: звонок идёт дальше, но остров свободен
                         is Act.CallA -> if (act.c.incoming) {
                             haptic()
                             Controls.hideIncomingCall()
+                            IslandBus.notchPopAt = SystemClock.elapsedRealtime()
                         }
                         else -> Unit
                     }
@@ -796,10 +818,16 @@ private fun classicChange(s: IslandSettings): ContentTransform {
     val origin = TransformOrigin(0.5f, 0.3f)
     val inSpec = tween<Float>((300 * m).toInt(), delayMillis = (100 * m).toInt(), easing = ExpoOut)
     val outSpec = tween<Float>((167 * m).toInt(), easing = LinearEasing)
+    // «Физика пружины»: масштаб нового содержимого идёт пружиной из «Упругости», а не твином —
+    // мягкий перелёт в конце, как у самой формы острова
+    val springy = !s.reduceEffects && s.expandStyle != ExpandStyle.INSTANT
+    val enterSpec: FiniteAnimationSpec<Float> = if (springy) {
+        spring(dampingRatio = (s.elasticity.damping * 0.9f).coerceAtLeast(0.5f), stiffness = animStiffness(s) * 1.6f)
+    } else inSpec
     val enter = if (s.reduceEffects) {
         fadeIn(tween(150))
     } else {
-        fadeIn(inSpec) + scaleIn(inSpec, initialScale = 0.9f, transformOrigin = origin)
+        fadeIn(enterSpec) + scaleIn(enterSpec, initialScale = 0.9f, transformOrigin = origin)
     }
     val exit = if (s.reduceEffects) {
         fadeOut(tween(90))

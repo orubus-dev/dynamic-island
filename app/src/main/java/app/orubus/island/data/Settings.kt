@@ -184,6 +184,14 @@ data class IslandSettings(
     val privacyDots: Boolean = true,
     /** Точки видны и на экране блокировки */
     val dotsOnLockscreen: Boolean = true,
+    /** Отчёт щита: короткая плашка, когда двойная подавлена */
+    val evShield: Boolean = false,
+    /** Подключены проводные наушники */
+    val evWired: Boolean = true,
+    /** Телефон зарядился до 100% */
+    val evCharged: Boolean = true,
+    /** Режим энергосбережения включился или выключился */
+    val evPowerSave: Boolean = true,
     /** Анимация разблокировки в стиле Face ID (бета) */
     val evFaceUnlock: Boolean = false,
     val faceStyle: FaceStyle = FaceStyle.SMALL,
@@ -275,6 +283,8 @@ data class IslandSettings(
     // Эффекты — каждый можно выключить отдельно; «Уменьшить эффекты» выключает их все
     /** Содержимое острова перетекает с размытием (Android 12+) */
     val fxBlur: Boolean = true,
+    /** Морозный переход: с Liquid Glass смена содержимого идёт через морозную дымку с бликом */
+    val fxFrost: Boolean = true,
     /** Полоски эквалайзера пляшут под музыку; выключено — стоят ровно, так экономнее */
     val fxEqualizer: Boolean = true,
     /** Частота кадров эквалайзера и свечения: 60 — плавно и вдвое легче, чем 120 у экрана */

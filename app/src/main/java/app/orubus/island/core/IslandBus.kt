@@ -1,5 +1,7 @@
 package app.orubus.island.core
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Security
 import app.orubus.island.data.SettingsRepo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -108,37 +110,82 @@ object IslandBus {
     }
 
     /**
-     * Гаситель двойных плашек: одна и та же плашка (заголовок + текст + стиль), пришедшая
-     * повторно в течение [DEDUP_MS], не показывается. Мессенджеры любят перезаливать уведомление
-     * (прочитано, реакции, дубли под другим ключом) — без гасителя остров мигает дважды.
+     * Гаситель двойных плашек, два окна:
+     *  • [DEDUP_MS] — одна и та же плашка (заголовок + текст + стиль) не показывается второй раз,
+     *    пока не прошло 4,5 секунды; мессенджеры любят перезаливать уведомление (прочитано,
+     *    реакции, дубли под другим ключом) — без гасителя остров мигал бы дважды;
+     *  • [BURST_MS] — мгновенное подавление в те же миллисекунды: повтор с тем же заголовком
+     *    и стилем, пришедший быстрее 900 мс (даже с изменившимся текстом), гасится сразу.
      */
     private val recent = object : LinkedHashMap<String, Long>(32, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Long>?) = size > 40
     }
+
+    /** Те же плашки крупными мазками (без текста) — для мгновенного окна [BURST_MS] */
+    private val coarse = HashMap<String, Long>()
 
     /** Сколько одинаковых плашек погашено с запуска — для отладки «почему не показалось» */
     @Volatile
     var deduped = 0
         private set
 
+    /** «Пружинка из выреза»: время запроса (elapsedRealtime). 0 — запроса нет; гаснет за 1,5 с */
+    @Volatile
+    var notchPopAt = 0L
+
+    private fun signature(n: Notice): String {
+        val text = n.message?.text ?: n.state
+        return "${n.title}\u0000$text\u0000${n.style}"
+    }
+
     fun post(n: Notice) {
         // Тихие часы: остров молчит — плашки не показываются (уведомления остаются в шторке)
         val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
         if (SettingsRepo.current.inQuietHours(hour)) return
-        val sig = "${n.title}\u0000${n.state}\u0000${n.style}"
+        val sig = signature(n)
         val now = android.os.SystemClock.elapsedRealtime()
         synchronized(recent) {
             val last = recent[sig]
-            if (last != null && now - last < DEDUP_MS) {
+            val burst = coarse["${n.title}\u0000${n.style}"]
+            if (last != null && now - last < DEDUP_MS || burst != null && now - burst < BURST_MS) {
                 deduped++
+                reportShield()
                 return
             }
             recent[sig] = now
+            coarse["${n.title}\u0000${n.style}"] = now
+            if (coarse.size > 40) coarse.remove(coarse.keys.first())
         }
         queue.trySend(n)
     }
 
+    @Volatile
+    private var lastShieldNotice = 0L
+
+    /** «Дубль заблокирован»: короткий отчёт щита, если его включили в «Системных оповещениях» */
+    private fun reportShield() {
+        if (!SettingsRepo.current.evShield) return
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - lastShieldNotice < 6_000) return
+        lastShieldNotice = now
+        scope.launch {
+            kotlinx.coroutines.delay(450)
+            post(
+                Notice(
+                    app.orubus.island.core.tr("Щит", "Shield"),
+                    app.orubus.island.core.tr("дубль заблокирован", "duplicate blocked"),
+                    Icons.Rounded.Security,
+                    Tints.Blue,
+                    style = NoticeStyle.PILL,
+                ),
+            )
+        }
+    }
+
     private const val DEDUP_MS = 4_500L
+
+    /** Окно мгновенного подавления: повторы, пришедшие в эти миллисекунды, гасятся всегда */
+    private const val BURST_MS = 900L
 }
 
 /** Команды службе: скриншот без острова, блокировка экрана, выключение острова (для банков). */

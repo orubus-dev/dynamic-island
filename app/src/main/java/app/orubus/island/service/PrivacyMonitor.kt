@@ -8,10 +8,13 @@ import android.media.AudioManager
 import android.media.AudioRecordingConfiguration
 import android.net.ConnectivityManager
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import java.lang.reflect.Proxy
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Face
 import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material.icons.rounded.WifiTethering
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.core.content.ContextCompat
@@ -43,12 +46,16 @@ object PrivacyMonitor {
     private var started = false
     private var pollJob: Job? = null
     private var hotspotLast = false
+    private val main = Handler(Looper.getMainLooper())
     private var tetherManager: Any? = null
     private var tetherProxy: Any? = null
 
     // Кто именно пишет звук / держит камеру — из AppOps (короткие коды стабильны годами)
     private const val OP_RECORD_AUDIO = 27
     private const val OP_CAMERA = 26
+    /** Фонарик горит: вспышка держит камеру — не спутать её с камерой */
+    @Volatile
+    private var torchOn = false
     private var micPkg: String? = null
     private var camPkg: String? = null
     private var appContext: Context? = null
@@ -72,6 +79,17 @@ object PrivacyMonitor {
         }, null)
 
         val camera = app.getSystemService(Context.CAMERA_SERVICE) as CameraManager
+        // Фонарик тоже открывает камеру. Следим за вспышкой отдельно: пока она горит (даже у чужого
+        // приложения), «камеру в использовании» не объявляем — иначе фонарик выдавал себя за камеру
+        camera.registerTorchCallback(object : CameraManager.TorchCallback() {
+            override fun onTorchModeChanged(cameraId: String, enabled: Boolean) {
+                torchOn = enabled
+                if (enabled && cam && camPkg == null) {
+                    cam = false
+                    IslandBus.camActive.value = false
+                }
+            }
+        }, null)
         camera.registerAvailabilityCallback(object : CameraManager.AvailabilityCallback() {
             override fun onCameraAvailable(cameraId: String) {
                 if (isMainCamera(app, cameraId)) {
@@ -81,11 +99,15 @@ object PrivacyMonitor {
             }
 
             override fun onCameraUnavailable(cameraId: String) {
-                if (isMainCamera(app, cameraId)) {
+                if (!isMainCamera(app, cameraId)) return
+                // Фонарик открывает камеру тем же вызовом: смотрим на вспышку чуть позже,
+                // когда её состояние уже точно дошло, и только тогда объявляем камеру
+                main.postDelayed({
+                    if (!started || torchOn || camPkg != null) return@postDelayed
                     cam = true
-                    if (camPkg == null) IslandBus.camActive.value = true
+                    IslandBus.camActive.value = true
                     announce()
-                }
+                }, 250)
             }
         }, null)
 
@@ -123,6 +145,7 @@ object PrivacyMonitor {
         }
         tetherProxy = null
         tetherManager = null
+        main.removeCallbacksAndMessages(null)
         IslandBus.micActive.value = false
         IslandBus.camActive.value = false
         IslandBus.hotspotOn.value = false
@@ -254,17 +277,27 @@ object PrivacyMonitor {
         }
         // Знаем, кто именно пользуется — зовём по имени
         val who = appLabel(appContext, micPkg ?: camPkg)
-        if (who != null) {
-            IslandBus.post(
+        val camera = showCam && (who != null || !showMic)
+        // У камеры — своя анимация: зелёная пульсирующая линза (NoticeStyle.CAM).
+        // Микрофон показывает прежнюю оранжевую пилюлю с качающимся значком
+        when {
+            camera && who != null -> IslandBus.post(
+                Notice(title, who, Icons.Rounded.Videocam, Tints.Green, style = NoticeStyle.CAM),
+            )
+            camera -> IslandBus.post(
                 Notice(
                     title,
-                    who,
-                    Icons.Rounded.Mic,
-                    Tints.Orange,
+                    tr("используется приложением", "in use by an app"),
+                    Icons.Rounded.Videocam,
+                    Tints.Green,
+                    style = NoticeStyle.CAM,
+                    extraMs = 800,
                 ),
             )
-        } else {
-            IslandBus.post(
+            who != null -> IslandBus.post(
+                Notice(title, who, Icons.Rounded.Mic, Tints.Orange),
+            )
+            else -> IslandBus.post(
                 Notice(
                     title,
                     tr("используется приложением", "in use by an app"),

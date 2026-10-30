@@ -6,6 +6,19 @@ Versioning: the second number (1.5, 1.6…) means new and changed features, the 
 
 > Since 1.6.1 the app and the island speak English (Features → General → Language). Earlier versions were in Russian only, so older entries give the Russian label in brackets.
 
+## [1.10.1] — 2026-10-30
+
+- 📵 **Popup shield with built-in adb** — system heads-up banners (the second source of double pop-ups) turn off with one button when WRITE_SECURE_SETTINGS is granted. The island now carries its own adb client, Shizuku/LADB-style: enter the debugging address and port and it connects by itself (RSA, with the "Allow debugging" dialog) and runs the shield commands. Screen: Permissions → Popup shield.
+- 🛡️ **Millisecond duplicate shield** — a repeat banner arriving within 900 ms is killed instantly, even if its text changed; the 4.5 s window for fully identical banners stays. An optional "Shield · duplicate blocked" report lives in System Alerts.
+- 📷 **Camera gets its own animation** — a green lens with a pulsing ring instead of the microphone pill; the flashlight (even from another app) no longer fakes a camera.
+- ✏️ **Unlock — the whole word** — the Face Unlock small notch clipped the word to "Unloc": the capsule now widens so the whole "Unlocked" fits at any font size.
+- ⚙️ **Settings is back in the dock** — fixed the floating dock layout: both tabs with icons and labels always visible.
+- 🎛️ **Expanded island, under control** — Position and size has sliders for the big island's shape and size: height, the expanded corner radius and the maximum expansion width.
+- 🧊 **Frosted transitions get their own toggle** (Effects), and incoming content scales on the elasticity spring — spring physics in the content flow too.
+- 🎧 **New events** — wired headphones, "Charged" at 100%, Android battery saver — each with its own toggle.
+- 🫥 **A spring out of the camera** — after swiping the last banner away, the island dives into the notch and pops right back out as an idle capsule.
+- 🧹 **Live clear** — a notification removed in the shade clears its island card instantly.
+
 ## [1.10.0] — 2026-10-30
 
 - 📏 **Expanded notch size editing** — the expanded island and notices get their own height slider (80–180%) next to the maximum width, so the big notch finally fits your screen exactly.

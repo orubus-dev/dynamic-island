@@ -63,6 +63,7 @@ import app.orubus.island.R
 import app.orubus.island.core.LangScope
 import app.orubus.island.core.tr
 import app.orubus.island.data.SettingsRepo
+import app.orubus.island.ui.screens.AdbScreen
 import app.orubus.island.ui.screens.AnimScreen
 import app.orubus.island.ui.screens.AppInfoScreen
 import app.orubus.island.ui.screens.BannersScreen
@@ -96,7 +97,7 @@ import app.orubus.island.update.UpdateChecker
 
 enum class Screen {
     CARDS, EVENTS, GESTURES, LYRICS, SIZE, COLORS, INSTRUCTION, ABOUT, DIAG, LOOK, ANIM, EFFECTS, BANNERS,
-    PERMISSIONS, TESTS, NOTIFICATIONS, BEHAVIOR, PAYDIAG, KEEPALIVE, BANKS, DISPLAY, WHATSNEW, PRIVACY, FEATURES, BT, LICENSES,
+    PERMISSIONS, TESTS, NOTIFICATIONS, BEHAVIOR, PAYDIAG, KEEPALIVE, BANKS, DISPLAY, WHATSNEW, PRIVACY, FEATURES, BT, LICENSES, ADB,
 }
 
 class MainActivity : ComponentActivity() {
@@ -174,6 +175,7 @@ private fun AppRoot() {
                     Screen.WHATSNEW.name -> WhatsNewScreen(back)
                     Screen.PRIVACY.name -> PrivacyScreen(back)
                     Screen.LICENSES.name -> LicensesScreen(back)
+                    Screen.ADB.name -> AdbScreen(back)
                     Screen.FEATURES.name -> FeaturesScreen(open)
                     Screen.CARDS.name -> CardsScreen(back) { open(Screen.INSTRUCTION) }
                     Screen.GESTURES.name -> GesturesScreen(back)
