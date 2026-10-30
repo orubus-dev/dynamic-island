@@ -44,10 +44,12 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.orubus.island.R
@@ -112,14 +114,16 @@ fun RefractionDock(
     }
 }
 
-/** Подпись вкладки: если не влезает (крупный шрифт Android), чуть уменьшается, а не обрезается. */
+/** Подпись вкладки: если не влезает (крупный шрифт Android), чуть уменьшается, а не обрезается.
+ * Важно: без fillMaxWidth — иначе первая вкладка забирает всю ширину дока, и «Настройки» уезжает за экран. */
 @Composable
 private fun TabLabel(text: String, color: Color, bold: Boolean) {
     val measurer = rememberTextMeasurer()
     val base = LocalTextStyle.current
     val weight = if (bold) FontWeight.SemiBold else FontWeight.Medium
-    BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = 2.dp), contentAlignment = Alignment.Center) {
-        val room = constraints.maxWidth
+    BoxWithConstraints(contentAlignment = Alignment.Center) {
+        val room = constraints.maxWidth.takeIf { it != Constraints.Infinity }
+            ?: with(LocalDensity.current) { 400.dp.roundToPx() }
         val size = remember(text, room, weight) {
             var sz = 12f
             while (sz > 8f && measurer.measure(text, base.copy(fontSize = sz.sp, fontWeight = weight), maxLines = 1).size.width > room) {

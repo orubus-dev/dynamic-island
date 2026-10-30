@@ -9,6 +9,7 @@ import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.Transition
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.runtime.DisposableEffect
@@ -353,6 +354,20 @@ fun IslandOverlay(
     }
     val hiddenNow = rememberUpdatedState(hidden)
 
+    // После смахнутой плашки, когда показывать больше нечего, остров ныряет в вырез и тут же
+    // выпрыгивает из него обратно — «пружинка из-под камеры» вместо внезапной смены на пустую капсулу
+    var popHide by remember { mutableStateOf(false) }
+    LaunchedEffect(primary.id) {
+        val at = IslandBus.notchPopAt
+        if (at == 0L) return@LaunchedEffect
+        IslandBus.notchPopAt = 0L
+        if (primary !is Act.Idle || s.reduceEffects) return@LaunchedEffect
+        if (SystemClock.elapsedRealtime() - at > 1500) return@LaunchedEffect
+        popHide = true
+        delay(320)
+        popHide = false
+    }
+
     // Где остров в окне — вокруг него рисуются эффекты пасхалки
     val body = remember { mutableStateOf(Rect.Zero) }
     val onBody = remember(onBodyBounds) {
@@ -373,7 +388,7 @@ fun IslandOverlay(
         // «Скрывать пустой остров»: он не пропадает рывком, а уходит в камеру и выходит из неё
         val top = TransformOrigin(0.5f, 0f)
         AnimatedVisibility(
-            !hidden,
+            !hidden && !popHide,
             enter = if (s.reduceEffects) fadeIn() else scaleIn(islandSpec(s), initialScale = 0.3f, transformOrigin = top) + fadeIn(tween(120)),
             exit = if (s.reduceEffects) fadeOut() else scaleOut(islandSpec(s), targetScale = 0.3f, transformOrigin = top) + fadeOut(tween(160)),
         ) {
@@ -712,13 +727,19 @@ private fun IslandBody(
                         is Act.NoticeA -> {
                             if (settings.swipeClearNotif) act.n.message?.key?.let { NotifListener.cancelKey(it) }
                             IslandBus.notice.value = null
+                            // Пустому острову после смахнутой плашки — выход из-под камеры
+                            IslandBus.notchPopAt = SystemClock.elapsedRealtime()
                         }
                         // Подсказку оплаты тоже можно смахнуть
-                        is Act.PayA -> PayMonitor.clearReady()
+                        is Act.PayA -> {
+                            PayMonitor.clearReady()
+                            IslandBus.notchPopAt = SystemClock.elapsedRealtime()
+                        }
                         // И входящий звонок, если не хочется отвечать: звонок идёт дальше, но остров свободен
                         is Act.CallA -> if (act.c.incoming) {
                             haptic()
                             Controls.hideIncomingCall()
+                            IslandBus.notchPopAt = SystemClock.elapsedRealtime()
                         }
                         else -> Unit
                     }
@@ -776,17 +797,22 @@ private fun IslandBody(
 
 /**
  * Прежнее перетекание, как в ролике: старое тает за 1/6 с, уменьшаясь, новое проявляется чуть позже
- * из 90% размера. Скорость — от «Длительности» (по умолчанию как в ролике).
+ * из 90% размера. Скорость — от «Длительности» (по умолчанию как в ролике). С «Физикой пружины» и без
+ * «Уменьшить эффекты» масштаб идёт пружиной из настроек упругости — мягкий перелёт вместо твина.
  */
 private fun classicChange(s: IslandSettings): ContentTransform {
     val m = motionScale(s)
     val origin = TransformOrigin(0.5f, 0.3f)
     val inSpec = tween<Float>((300 * m).toInt(), delayMillis = (100 * m).toInt(), easing = ExpoOut)
     val outSpec = tween<Float>((167 * m).toInt(), easing = LinearEasing)
+    val springy = !s.reduceEffects && s.expandStyle != ExpandStyle.INSTANT
+    val enterSpec: FiniteAnimationSpec<Float> = if (springy) {
+        spring(dampingRatio = (s.elasticity.damping * 0.9f).coerceAtLeast(0.5f), stiffness = animStiffness(s) * 1.6f)
+    } else inSpec
     val enter = if (s.reduceEffects) {
         fadeIn(tween(150))
     } else {
-        fadeIn(inSpec) + scaleIn(inSpec, initialScale = 0.9f, transformOrigin = origin)
+        fadeIn(enterSpec) + scaleIn(enterSpec, initialScale = 0.9f, transformOrigin = origin)
     }
     val exit = if (s.reduceEffects) {
         fadeOut(tween(90))
@@ -796,10 +822,16 @@ private fun classicChange(s: IslandSettings): ContentTransform {
     return enter togetherWith exit
 }
 
-/** Размытие к прежнему перетеканию (Android 12+): новое проявляется из 7 dp, уходящее размывается до 5 dp. */
+/**
+ * Размытие к прежнему перетеканию (Android 12+): новое проявляется из размытия, уходящее растворяется.
+ * С Liquid Glass и «Морозным переходом» дымка гуще — как матовое стекло, и блик пробегает по стеклу.
+ */
 @Composable
 private fun AnimatedVisibilityScope.classicFlow(s: IslandSettings): Modifier {
     val m = motionScale(s)
+    val frost = s.liquidGlass && s.fxFrost && !s.reduceEffects
+    val inBlur = if (frost) 11f else 7f
+    val outBlur = if (frost) 8f else 5f
     val blur = transition.animateFloat(
         transitionSpec = {
             if (targetState == EnterExitState.Visible) tween((300 * m).toInt(), delayMillis = (100 * m).toInt(), easing = ExpoOut)
@@ -809,8 +841,8 @@ private fun AnimatedVisibilityScope.classicFlow(s: IslandSettings): Modifier {
     ) { state ->
         when {
             s.reduceEffects || !s.fxBlur -> 0f
-            state == EnterExitState.PreEnter -> 7f
-            state == EnterExitState.PostExit -> 5f
+            state == EnterExitState.PreEnter -> inBlur
+            state == EnterExitState.PostExit -> outBlur
             else -> 0f
         }
     }

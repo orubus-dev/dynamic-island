@@ -19,22 +19,16 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Bolt
-import androidx.compose.material.icons.rounded.Call
-import androidx.compose.material.icons.rounded.ContentCopy
-import androidx.compose.material.icons.rounded.DoubleArrow
-import androidx.compose.material.icons.rounded.FlashlightOn
-import androidx.compose.material.icons.rounded.BlurOn
-import androidx.compose.material.icons.rounded.Lock
-import androidx.compose.material.icons.rounded.Mic
-import androidx.compose.material.icons.rounded.Navigation
-import androidx.compose.material.icons.rounded.BluetoothAudio
+import androidx.compose.material.icons.rounded.Face
+import androidx.compose.material.icons.rounded.Grain
+import androidx.compose.material.icons.rounded.HealthAndSafety
+import androidx.compose.material.icons.rounded.OpenInFull
+import androidx.compose.material.icons.rounded.ScreenRotation
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Videocam
+import androidx.compose.material.icons.rounded.VpnKey
 import androidx.compose.material.icons.rounded.Security
-import androidx.compose.material.icons.rounded.SportsEsports
 import androidx.compose.material.icons.rounded.Swipe
-import androidx.compose.material.icons.rounded.TextFields
-import androidx.compose.material.icons.rounded.VolumeUp
-import androidx.compose.material.icons.rounded.WifiTethering
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -47,10 +41,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import app.orubus.island.core.Controls
 import app.orubus.island.core.IslandBus
 import app.orubus.island.core.tr
-import app.orubus.island.data.SettingsRepo
 import app.orubus.island.service.PrivacyMonitor
 import app.orubus.island.ui.Page
 import app.orubus.island.ui.Ui
@@ -67,77 +59,57 @@ private data class WhatsNewPage(
 
 private fun pages() = listOf(
     WhatsNewPage(
-        Icons.Rounded.BlurOn, tr("Liquid Glass Monochrome", "Liquid Glass Monochrome"),
-        tr("Приложение и остров теперь в монохромном жидком стекле: стеклянные панели, плавающий док и мягкие анимации состояний.",
-            "The app and the island are now liquid glass monochrome: glass panels, a floating dock and soft state-change animations."),
+        Icons.Rounded.Grain, tr("Морозные переходы", "Frosted transitions"),
+        tr("Смена содержимого идёт через морозную дымку, по стеклу пробегает блик, а масштаб движется пружиной — Liquid Glass теперь живёт и в анимациях.",
+            "Content changes pass through a frosted haze, a sheen sweeps the glass, and scale moves on a spring — Liquid Glass now lives in the animations too."),
     ),
     WhatsNewPage(
-        Icons.Rounded.Bolt, tr("Остров не умирает", "The island stays alive"),
-        tr("Движок проверяет службы каждые 10 секунд и оживляет их сам. Включите самолечение один раз — и остров всегда с вами.",
-            "The engine checks the services every 10 seconds and revives them. Enable self-heal once — the island is always with you."),
-        tr("Открыть движок", "Open the engine"),
+        Icons.Rounded.Security, tr("Щит против дублей за миллисекунды", "Millisecond duplicate shield"),
+        tr("Повторная плашка, пришедшая быстрее 900 мс, гасится сразу — даже если у неё изменился текст. Один пузырь, ни второго, ни третьего.",
+            "A repeat banner arriving within 900 ms is killed instantly — even if its text changed. One bubble, no second, no third."),
     ),
     WhatsNewPage(
-        Icons.Rounded.Call, tr("Никаких двойных плашек", "No more double pop-ups"),
-        tr("Одинаковые уведомления, приходящие дважды, схлопываются в одну плашку в течение 4,5 секунды.",
-            "Identical notifications arriving twice collapse into one pop-up within a 4.5-second window."),
-    ),
-    WhatsNewPage(
-        Icons.Rounded.TextFields, tr("Display: стиль и текст", "Display: style and text"),
-        tr("Стиль капсулы или выреза, радиусы углов, максимальная ширина, цвет и размер текста, свой шрифт — всё в одном разделе.",
-            "Capsule or notch style, corner radii, maximum width, text color and size, your own font — all in one section."),
-    ),
-    WhatsNewPage(
-        Icons.Rounded.Mic, tr("Приватность: микрофон и камера", "Privacy: microphone and camera"),
-        tr("Точки у острова показывают, когда приложения пользуются микрофоном или камерой — как индикаторы Android, но заметнее.",
-            "Dots by the island show when apps use the microphone or camera — like Android indicators, but easier to notice."),
-    ),
-    WhatsNewPage(
-        Icons.Rounded.WifiTethering, tr("Хотспот в острове", "Hotspot in the notch"),
-        tr("Точка доступа включилась — остров покажет плашку. Статус хотспота виден одним взглядом.",
-            "The hotspot turned on — the island shows a notice. Hotspot status at a glance."),
-    ),
-    WhatsNewPage(
-        Icons.Rounded.Swipe, tr("Смахнуть — значит убрать", "Swipe to clear notifications"),
-        tr("Смахните уведомление с острова вверх — оно исчезнет и из шторки. Настроить можно в «Жестах».",
-            "Swipe a notification up on the island — it clears from the shade too. Toggle it in Gestures."),
-    ),
-    WhatsNewPage(
-        Icons.Rounded.Lock, tr("Face Unlock (бета)", "Face Unlock (beta)"),
-        tr("Плавная анимация разблокировки в стиле Face ID: раскрытый вид или малый вырез. Ранняя бета — улучшаем.",
-            "A smooth Face ID-style unlock animation: expanded view or a small notch. Early beta — improvements underway."),
+        Icons.Rounded.HealthAndSafety, tr("Экранный щит и свой adb", "Popup shield with built-in adb"),
+        tr("Системные всплывающие плашки — второй источник двойных поп-апов. Щит выключает их в один тап, а встроенный adb (как Shizuku) сам подключается к отладке и выполняет команды.",
+            "System heads-up banners are the second source of double pop-ups. The shield turns them off in one tap, and the built-in adb (Shizuku-style) connects to debugging and runs the commands by itself."),
         tr("Попробовать", "Try it now"),
     ),
     WhatsNewPage(
-        Icons.Rounded.ContentCopy, tr("Двойной остров", "Dual notch"),
-        tr("Идут и музыка, и уведомление? Покажем вторую плашку вместо кружка рядом с первой.",
-            "Music and a notification at once? Show a second notch instead of the little bubble."),
-    ),
-    WhatsNewPage(
-        Icons.Rounded.SportsEsports, tr("Игровой режим", "Game mode"),
-        tr("Прячьте остров во время игр или оставляйте только важное. Полный контроль — в «Display».",
-            "Hide the island during games or keep only what matters. Full control lives in Display."),
-    ),
-    WhatsNewPage(
-        Icons.Rounded.VolumeUp, tr("Ползунок громкости", "Volume slider"),
-        tr("Долгое нажатие на правой половине острова и скольжение — громкость меняется прямо над экраном, с виброоткликом на каждый шаг.",
-            "Long-press the right half of the island and slide — volume changes right above the screen, with a haptic tick on every step."),
-    ),
-    WhatsNewPage(
-        Icons.Rounded.BluetoothAudio, tr("Bluetooth: свои значки", "Bluetooth: custom icons"),
-        tr("Наушники подключились — остров покажет их имя и заряд. Загрузите своё фото — оно станет значком в плашке и в плеере.",
-            "Headphones connected — the island shows their name and charge. Upload your own photo and it becomes the icon in the notice and the player."),
+        Icons.Rounded.Videocam, tr("У камеры — своя анимация", "Camera gets its own animation"),
+        tr("Камера больше не показывает анимацию микрофона: зелёная линза мягко пульсирует, как точка камеры у iPhone. Фонарик тоже больше не притворяется камерой.",
+            "The camera no longer borrows the microphone animation: a green lens pulses softly, like the iPhone's camera dot. The flashlight no longer fakes a camera either."),
         tr("Попробовать", "Try it now"),
     ),
     WhatsNewPage(
-        Icons.Rounded.Security, tr("Защита от пропусков", "Popup protection"),
-        tr("В «Разрешениях» теперь доктор: движок, слушатель уведомлений и батарея на одном экране. Скрипт wireless debugging из репозитория выдаёт всё за минуту.",
-            "Permissions now has a doctor: engine, notification listener and battery on one screen. The wireless-debugging script from the repo grants everything in a minute."),
+        Icons.Rounded.OpenInFull, tr("Раскрытый остров под контроль", "Expanded island, under control"),
+        tr("В «Положении и размере» появились форма и размер большого острова: высота плашек в процентах, скругление больших углов и максимальная ширина.",
+            "Position and size now edits the big island too: notice height in percent, the expanded corner radius and the maximum width."),
     ),
     WhatsNewPage(
-        Icons.Rounded.Swipe, tr("Смахивание стало живым", "Swiping feels alive"),
-        tr("Плашка едет за пальцем, быстрый бросок тоже срабатывает, а смахнутое уведомление улетает за край экрана — влево, вправо или вверх.",
-            "The card follows your finger, fast flicks work too, and a swiped notification flies off the edge — left, right or up."),
+        Icons.Rounded.Face, tr("Unlock — целиком", "Unlock — the whole word"),
+        tr("Малый вырез Face Unlock больше не обрезает слово до «Unloc»: капсула раздвигается ровно настолько, чтобы «Unlocked» поместилось целиком при любом шрифте.",
+            "The Face Unlock small notch no longer clips the word to \"Unloc\": the capsule widens just enough for the whole \"Unlocked\" at any font size."),
+        tr("Попробовать", "Try it now"),
+    ),
+    WhatsNewPage(
+        Icons.Rounded.Settings, tr("Настройки вернулись в док", "Settings is back in the dock"),
+        tr("Значок настроек снова стоит рядом с «Домой» и больше не уезжает за экран — док показывает обе вкладки целиком.",
+            "The settings icon sits next to Home again instead of sliding off-screen — the dock always shows both tabs."),
+    ),
+    WhatsNewPage(
+        Icons.Rounded.VpnKey, tr("Новые события: VPN и проводные", "New events: VPN and wired"),
+        tr("Остров замечает VPN-туннель и проводные наушники, сообщает, когда батарея дошла до 100%, — всё настраивается в «Системных оповещениях».",
+            "The island notices VPN tunnels and wired headphones, and reports when the battery hits 100% — all in System Alerts."),
+    ),
+    WhatsNewPage(
+        Icons.Rounded.ScreenRotation, tr("Автоповорот и энергосбережение", "Auto-rotate and battery saver"),
+        tr("Два новых события в «Режимах»: включили или выключили автоповорот, включилось или выключилось энергосбережение Android.",
+            "Two new events in Modes: auto-rotate turned on or off, and Android's battery saver turned on or off."),
+    ),
+    WhatsNewPage(
+        Icons.Rounded.Swipe, tr("Пружинка из-под камеры", "A spring out of the camera"),
+        tr("Смахнули последнюю плашку — остров ныряет в вырез и тут же выпрыгивает обратно пустой капсулой. Смахнутое в шторке уведомление убирает плашку мгновенно.",
+            "Swipe the last banner away — the island dives into the notch and springs right back out as an idle capsule. Removing a notification in the shade clears its card instantly too."),
     ),
 )
 
@@ -233,18 +205,21 @@ fun WhatsNewScreen(onBack: () -> Unit) {
 
 private fun tryIt(context: android.content.Context, index: Int) {
     when (index) {
-        1 -> SettingsRepo.update { copy(keepAlive = true, autoHeal = true) }
-        6 -> Controls.postDemoMessage()
-        7 -> IslandBus.post(PrivacyMonitor.demoNotice())
-        11 -> IslandBus.post(
+        2 -> IslandBus.post(
             app.orubus.island.core.Notice(
-                tr("boAt Airdopes 141", "boAt Airdopes 141"), null,
-                app.orubus.island.island.Ios.load(context, app.orubus.island.R.drawable.ios_headset),
-                app.orubus.island.core.Tints.Green,
-                ring = 0.75f,
-                caption = tr("Подключено", "Connected"),
+                tr("Щит", "Shield"), tr("дубль заблокирован", "duplicate blocked"),
+                Icons.Rounded.Security, app.orubus.island.core.Tints.Blue,
+                style = app.orubus.island.core.NoticeStyle.PILL, extraMs = 400,
             ),
         )
+        3 -> IslandBus.post(
+            app.orubus.island.core.Notice(
+                tr("Камера", "Camera"), tr("используется приложением", "in use by an app"),
+                Icons.Rounded.Videocam, app.orubus.island.core.Tints.Green,
+                style = app.orubus.island.core.NoticeStyle.CAM, extraMs = 600,
+            ),
+        )
+        5 -> IslandBus.post(PrivacyMonitor.demoNotice())
     }
 }
 

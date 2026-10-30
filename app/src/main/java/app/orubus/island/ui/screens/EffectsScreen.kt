@@ -4,6 +4,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.BlurOn
 import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.Equalizer
+import androidx.compose.material.icons.rounded.Grain
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Nfc
 import androidx.compose.material.icons.rounded.Vibration
@@ -46,6 +47,12 @@ fun EffectsScreen(onBack: () -> Unit) {
                     "New content fades in from a blur (Android 12+)"),
                 s.fxBlur, color = Tile.Indigo) { v ->
                 SettingsRepo.update { copy(fxBlur = v) }
+            }
+            GroupToggle(Pos.Middle, Icons.Rounded.Grain, tr("Морозный переход", "Frosted transitions"),
+                tr("С Liquid Glass смена содержимого идёт через морозную дымку с бликом стекла",
+                    "With Liquid Glass, content changes pass through a frosted haze with a glass sheen"),
+                s.fxFrost, color = Tile.Indigo) { v ->
+                SettingsRepo.update { copy(fxFrost = v) }
             }
             GroupItem(Pos.Middle, Icons.Rounded.GraphicEq, tr("Частота украшений", "Decoration rate"), s.fxRate.title,
                 onClick = { rateDialog = true }, color = Tile.Gray) { Arrow() }

@@ -21,6 +21,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -32,6 +33,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Face
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -82,6 +84,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
+import kotlinx.coroutines.isActive
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -125,11 +128,12 @@ fun compactGap(s: IslandSettings): Dp = s.cameraGap.dp.coerceAtLeast(8.dp)
 /** Самое широкое содержимое одной боковой части. */
 fun sideMax(s: IslandSettings): Dp = activeHeight(s) * 2.6f
 
-/** Высота события: заметно выше свёрнутого острова, как у раскрытых уведомлений iPhone (62 при высоте 37). */
-fun noticeHeight(s: IslandSettings): Dp = (s.height.dp * 1.68f).coerceAtLeast(56.dp)
+/** Высота события: заметно выше свёрнутого острова, как у раскрытых уведомлений iPhone (62 при высоте 37).
+ * «Высота раскрытого» из «Положения и размера» меняет её в процентах. */
+fun noticeHeight(s: IslandSettings): Dp = (s.height.dp * 1.68f * s.expandedHeightPct.coerceIn(70, 140) / 100f).coerceAtLeast(48.dp)
 
 /** Высота входящего звонка: аватар, имя и две большие кнопки в одну строку (84 при высоте 37). */
-fun callHeight(s: IslandSettings): Dp = (s.height.dp * 2.27f).coerceAtLeast(76.dp)
+fun callHeight(s: IslandSettings): Dp = (s.height.dp * 2.27f * s.expandedHeightPct.coerceIn(70, 140) / 100f).coerceAtLeast(72.dp)
 
 /** Ниже этой линии камера уже не мешает тексту — сюда ставится содержимое раскрытых карточек. */
 fun cameraInset(s: IslandSettings): Dp = s.height.dp * 0.5f + 11.5.dp
@@ -377,6 +381,7 @@ private fun NoticeCompact(n: Notice, s: IslandSettings, wideWidth: Dp) {
         n.style == NoticeStyle.SENT -> SentBanner(n, s, wideWidth)
         n.style == NoticeStyle.UPDATE -> UpdateCard(n, s, wideWidth)
         n.style == NoticeStyle.FACEID -> FaceIdNotice(n, s)
+        n.style == NoticeStyle.CAM -> CamPill(n, s)
         n.style == NoticeStyle.PILL || n.title.isBlank() && n.state == null -> PillNotice(n, s)
         else -> WideNotice(n, s, wideWidth)
     }
@@ -418,7 +423,9 @@ private fun FaceIdNotice(n: Notice, s: IslandSettings) {
         val h = activeHeight(s)
         val pop = remember(n.id) { Animatable(0.5f) }
         LaunchedEffect(n.id) { pop.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = 300f)) }
-        CompactRow(h, compactGap(s), h * 2.2f,
+        // Свободный запас по ширине: капсула сама раздвинется ровно настолько, чтобы «Unlocked»
+        // поместилось целиком — ни обрезки, ни «Unloc», что видели пользователи на крупном шрифте
+        CompactRow(h, compactGap(s), h * 4f,
             left = {
                 Icon(Icons.Rounded.Face, null, tint = Tints.Green, modifier = Modifier.size(h * 0.52f).scale(pop.value))
             },
@@ -430,6 +437,8 @@ private fun FaceIdNotice(n: Notice, s: IslandSettings) {
                         fontSize = (16f * (s.textScaleTitle / 100f)).coerceAtLeast(10f).sp,
                         fontWeight = FontWeight.SemiBold,
                         fontFamily = s.fontFamily.family(),
+                        maxLines = 1,
+                        softWrap = false,
                     )
                     Icon(Icons.Rounded.Check, null, tint = Tints.Green, modifier = Modifier.size(h * 0.34f))
                 }
@@ -437,6 +446,60 @@ private fun FaceIdNotice(n: Notice, s: IslandSettings) {
             shrink = false,
         )
     }
+}
+
+/**
+ * Доступ к камере — своя анимация, не как у микрофона: зелёная линза-«глазок» с мягко пульсирующим
+ * кольцом (как зелёная точка камеры у iPhone), микрофонная пилюля остаётся оранжевой с качанием.
+ */
+@Composable
+private fun CamPill(n: Notice, s: IslandSettings) {
+    val h = activeHeight(s)
+    val pop = remember(n.id) { Animatable(0.5f) }
+    val ring = remember(n.id) { Animatable(0f) }
+    LaunchedEffect(n.id) {
+        launch { pop.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = 300f)) }
+        if (!s.reduceEffects) {
+            while (kotlin.coroutines.coroutineContext.isActive) {
+                ring.animateTo(1f, tween(800, easing = FastOutSlowInEasing))
+                ring.snapTo(0f)
+            }
+        } else {
+            ring.snapTo(1f)
+        }
+    }
+    CompactRow(h, compactGap(s), h * 3f,
+        left = {
+            Box(contentAlignment = Alignment.Center) {
+                if (!s.reduceEffects) {
+                    Box(
+                        Modifier
+                            .size(h * 0.64f)
+                            .graphicsLayer {
+                                scaleX = 0.7f + 0.55f * ring.value
+                                scaleY = 0.7f + 0.55f * ring.value
+                                alpha = (1f - ring.value).coerceIn(0f, 1f) * 0.55f
+                            }
+                            .clip(CircleShape)
+                            .border(2.dp, Tints.Green, CircleShape),
+                    )
+                }
+                Icon(Icons.Rounded.Videocam, null, tint = Tints.Green, modifier = Modifier.size(h * 0.5f).scale(pop.value))
+            }
+        },
+        right = {
+            Text(
+                n.state ?: n.title,
+                color = Color(s.textColor),
+                fontSize = (15f * (s.textScaleTitle / 100f)).coerceAtLeast(10f).sp,
+                fontWeight = FontWeight.SemiBold,
+                fontFamily = s.fontFamily.family(),
+                maxLines = 1,
+                softWrap = false,
+            )
+        },
+        shrink = false,
+    )
 }
 
 @Composable

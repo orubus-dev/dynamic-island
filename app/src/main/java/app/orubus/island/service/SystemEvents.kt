@@ -3,7 +3,11 @@ package app.orubus.island.service
 import android.app.KeyguardManager
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.BatterySaver
 import androidx.compose.material.icons.rounded.Face
+import androidx.compose.material.icons.rounded.Headset
+import androidx.compose.material.icons.rounded.ScreenRotation
+import androidx.compose.material.icons.rounded.Security
 import android.app.NotificationManager
 import android.bluetooth.BluetoothClass
 import android.bluetooth.BluetoothDevice
@@ -62,8 +66,12 @@ class SystemEvents(private val context: Context) {
     private var dnd: Boolean? = null
     private val headsetBattery = HashMap<String, Int>()
     private val wifiNetworks = HashSet<Network>()
+    /** Активные VPN-сети: первая — «VPN подключён», когда опустела — «VPN отключён» */
+    private val vpnNetworks = HashSet<Network>()
     /** Когда подключили или отключили зарядку — кабель от компьютера не должен давать вторую плашку «USB» */
     private var lastPowerChange = 0L
+    /** Батарея была полна: «Заряжено» показываем один раз, при новой зарядке — снова */
+    private var fullAnnounced = false
 
     /** Первые секунды после запуска система присылает текущее состояние — это не события. */
     private val warmingUp get() = SystemClock.elapsedRealtime() - startedAt < 3000
@@ -130,6 +138,7 @@ class SystemEvents(private val context: Context) {
             addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED)
             addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
             addAction(USB_STATE)
+            addAction(Intent.ACTION_HEADSET_PLUG)
             addAction(NotificationManager.ACTION_INTERRUPTION_FILTER_CHANGED)
             addAction(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED)
         }
@@ -145,6 +154,11 @@ class SystemEvents(private val context: Context) {
         context.contentResolver.registerContentObserver(
             Settings.System.getUriFor(Settings.System.SCREEN_BRIGHTNESS_MODE), false, brightnessObserver,
         )
+        // Автоповорот: системная настройка, читается без разрешений
+        rotate = Settings.System.getInt(context.contentResolver, Settings.System.ACCELEROMETER_ROTATION, 0)
+        context.contentResolver.registerContentObserver(
+            Settings.System.getUriFor(Settings.System.ACCELEROMETER_ROTATION), false, rotateObserver,
+        )
 
         runCatching {
             connectivity?.registerNetworkCallback(
@@ -152,12 +166,20 @@ class SystemEvents(private val context: Context) {
                 wifiCallback,
             )
         }
+        runCatching {
+            connectivity?.registerNetworkCallback(
+                NetworkRequest.Builder().addTransportType(NetworkCapabilities.TRANSPORT_VPN).build(),
+                vpnCallback,
+            )
+        }
     }
 
     fun stop() {
         runCatching { context.unregisterReceiver(receiver) }
         runCatching { context.contentResolver.unregisterContentObserver(brightnessObserver) }
+        runCatching { context.contentResolver.unregisterContentObserver(rotateObserver) }
         runCatching { connectivity?.unregisterNetworkCallback(wifiCallback) }
+        runCatching { connectivity?.unregisterNetworkCallback(vpnCallback) }
     }
 
     private fun handle(intent: Intent, initialSticky: Boolean) {
@@ -184,6 +206,8 @@ class SystemEvents(private val context: Context) {
                 )
             }
 
+            Intent.ACTION_HEADSET_PLUG -> onWiredHeadset(intent, initialSticky)
+
             Intent.ACTION_USER_PRESENT -> onUnlocked()
 
             Intent.ACTION_SCREEN_OFF -> {
@@ -202,8 +226,20 @@ class SystemEvents(private val context: Context) {
                 IslandBus.keyguard.value = isKeyguard()
             }
 
-            PowerManager.ACTION_POWER_SAVE_MODE_CHANGED ->
+            PowerManager.ACTION_POWER_SAVE_MODE_CHANGED -> {
                 IslandBus.powerSave.value = context.getSystemService(PowerManager::class.java)?.isPowerSaveMode == true
+                // «Энергосбережение» как событие: луна-батарея и состояние, если его включили в «Событиях»
+                val on = IslandBus.powerSave.value
+                notice(
+                    s.evPowerSave,
+                    Notice(
+                        tr("Энергосбережение", "Battery Saver"),
+                        if (on) tr("Вкл", "On") else tr("Выкл", "Off"),
+                        Icons.Rounded.BatterySaver,
+                        if (on) Tints.Yellow else Tints.Gray,
+                    ),
+                )
+            }
 
             NotificationManager.ACTION_INTERRUPTION_FILTER_CHANGED -> {
                 val on = isDnd()
@@ -308,6 +344,62 @@ class SystemEvents(private val context: Context) {
         }
     }
 
+    private val vpnCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: Network) {
+            main.post {
+                val wasEmpty = vpnNetworks.isEmpty()
+                vpnNetworks += network
+                if (wasEmpty) notice(s.evVpn, Notice("VPN", tr("Подключён", "Connected"), Icons.Rounded.Security, Tints.Blue))
+            }
+        }
+
+        override fun onLost(network: Network) {
+            main.post {
+                if (vpnNetworks.remove(network) && vpnNetworks.isEmpty()) {
+                    notice(s.evVpn, Notice("VPN", tr("Отключён", "Disconnected"), Icons.Rounded.Security, Tints.Gray))
+                }
+            }
+        }
+    }
+
+    /** Автоповорот: 1 — включён, 0 — отключён портретом */
+    private var rotate = -1
+    private val rotateObserver = object : ContentObserver(main) {
+        override fun onChange(selfChange: Boolean) {
+            val value = runCatching {
+                Settings.System.getInt(context.contentResolver, Settings.System.ACCELEROMETER_ROTATION, 0)
+            }.getOrDefault(rotate)
+            if (value == rotate) return
+            rotate = value
+            val on = value == 1
+            notice(
+                s.evRotate,
+                Notice(
+                    tr("Автоповорот", "Auto-rotate"),
+                    if (on) tr("Вкл", "On") else tr("Выкл", "Off"),
+                    Icons.Rounded.ScreenRotation,
+                    if (on) Tints.Blue else Tints.Gray,
+                    style = NoticeStyle.PILL,
+                ),
+            )
+        }
+    }
+
+    /** Проводные наушники: системное сообщение приходит и как липкое — при запуске его пропускаем */
+    private fun onWiredHeadset(intent: Intent, initialSticky: Boolean) {
+        if (initialSticky) return
+        val plugged = intent.getIntExtra("state", 0) == 1
+        notice(
+            s.evWired,
+            Notice(
+                tr("Проводные наушники", "Wired headphones"),
+                if (plugged) tr("Подключены", "Connected") else tr("Отключены", "Disconnected"),
+                Icons.Rounded.Headset,
+                if (plugged) Tints.Green else Tints.Gray,
+            ),
+        )
+    }
+
     private var lastUnlock = 0L
 
     /**
@@ -364,6 +456,15 @@ class SystemEvents(private val context: Context) {
         } else if (level >= 0 && !lowWarned) {
             lowWarned = true
             notice(s.evLowBattery, Notice(tr("Низкий заряд", "Low Battery"), "$level%", ic(R.drawable.ios_battery_dead), Tints.Red, battery = level))
+        }
+        // «Заряжено»: дошли до 100% — короткая зелёная плашка, один раз за зарядку
+        if (charging && level >= 100) {
+            if (!fullAnnounced) {
+                fullAnnounced = true
+                notice(s.evCharged, Notice(tr("Заряжено", "Charged"), "100%", ic(R.drawable.ios_battery_full), Tints.Green, battery = 100))
+            }
+        } else {
+            fullAnnounced = false
         }
     }
 

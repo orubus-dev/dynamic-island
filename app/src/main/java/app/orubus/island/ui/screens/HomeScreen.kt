@@ -37,6 +37,7 @@ import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.Campaign
 import androidx.compose.material.icons.rounded.Call
 import androidx.compose.material.icons.rounded.ChatBubble
+import androidx.compose.material.icons.rounded.GppGood
 import androidx.compose.material.icons.rounded.HealthAndSafety
 import androidx.compose.material.icons.rounded.HourglassBottom
 import androidx.compose.material.icons.rounded.Lightbulb
@@ -96,6 +97,7 @@ import app.orubus.island.island.glassSurface
 import app.orubus.island.island.islandGlow
 import app.orubus.island.island.islandShape
 import app.orubus.island.island.rememberHaptic
+import app.orubus.island.service.AdbShield
 import app.orubus.island.service.IslandEngine
 import app.orubus.island.service.NotificationParser
 import app.orubus.island.service.PrivacyMonitor
@@ -395,6 +397,16 @@ fun PermissionsScreen(onBack: () -> Unit, open: (Screen) -> Unit) {
                 else tr("Отключите оптимизацию батареи", "Turn off battery optimization"),
                 onClick = { Perms.openBattery(context) }, color = Tile.Orange,
             ) { Status(batteryOk) }
+            GroupItem(
+                Pos.Middle, Icons.Rounded.GppGood, tr("Экранный щит", "Popup shield"),
+                if (AdbShield.headsUpOff(context.contentResolver) == true) {
+                    tr("Системные плашки выключены — двойных поп-апов нет", "System banners are off — no more double pop-ups")
+                } else {
+                    tr("Выключить системные всплывающие плашки", "Turn off the system heads-up banners")
+                },
+                onClick = { open(Screen.ADB) }, color = Tile.Blue,
+                badge = tr("Новое", "New"),
+            ) { Status(AdbShield.headsUpOff(context.contentResolver) == true) }
             GroupItem(
                 Pos.Last, Icons.Rounded.Security, tr("Самолечение через adb", "Self-heal over adb"),
                 if (health.canSelfHeal) tr("Включено — остров поднимается сам", "On — the island revives itself")

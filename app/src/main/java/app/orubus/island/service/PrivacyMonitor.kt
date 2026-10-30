@@ -6,11 +6,13 @@ import android.hardware.camera2.CameraManager
 import android.media.AudioManager
 import android.media.AudioRecordingConfiguration
 import android.net.ConnectivityManager
-import android.net.TetheringManager
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Face
 import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material.icons.rounded.WifiTethering
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.core.content.ContextCompat
@@ -32,8 +34,7 @@ import kotlinx.coroutines.launch
  * статус хотспота и демонстрация Face Unlock.
  *
  * Микрофон — AudioRecordingCallback, камера — CameraManager.AvailabilityCallback.
- * Хотспот: с Android 11 — публичный TetheringManager, события приходят мгновенно без опроса;
- * на старых версиях — раз в 2 секунды скрытый (но стабильный с API 14) список
+ * Хотспот — раз в 2 секунды: скрытый (но стабильный с API 14) системный список
  * getTetheredIfaces и резерв по именам поднятых интерфейсов (ap0/swlan0/softap/rndis/ncm).
  */
 object PrivacyMonitor {
@@ -42,8 +43,12 @@ object PrivacyMonitor {
     private var started = false
     private var pollJob: Job? = null
     private var hotspotLast = false
-    private var tetherManager: TetheringManager? = null
-    private var tetherCallback: TetheringManager.TetheringEventCallback? = null
+    private var cameraManager: CameraManager? = null
+    private var torchCallback: CameraManager.TorchCallback? = null
+    /** Фонарик горит (в том числе чужим приложением): вспышка держит камеру — не спутать её с камерой */
+    @Volatile
+    private var torchOn = false
+    private val main = Handler(Looper.getMainLooper())
 
     fun start(context: Context, scope: CoroutineScope) {
         if (started) return
@@ -63,6 +68,20 @@ object PrivacyMonitor {
         }, null)
 
         val camera = app.getSystemService(Context.CAMERA_SERVICE) as CameraManager
+        // Фонарик тоже открывает камеру. Следим за ним отдельно: пока горит вспышка, "камеру в использовании"
+        // не объявляем — иначе фонарик любого приложения давал бы зелёную точку камеры
+        val torch = object : CameraManager.TorchCallback() {
+            override fun onTorchModeChanged(cameraId: String, enabled: Boolean) {
+                torchOn = enabled
+                if (enabled && cam) {
+                    cam = false
+                    IslandBus.camActive.value = false
+                }
+            }
+        }
+        camera.registerTorchCallback(torch, null)
+        cameraManager = camera
+        torchCallback = torch
         camera.registerAvailabilityCallback(object : CameraManager.AvailabilityCallback() {
             override fun onCameraAvailable(cameraId: String) {
                 if (isMainCamera(app, cameraId)) {
@@ -72,11 +91,15 @@ object PrivacyMonitor {
             }
 
             override fun onCameraUnavailable(cameraId: String) {
-                if (isMainCamera(app, cameraId)) {
+                if (!isMainCamera(app, cameraId)) return
+                // Фонарик открывает камеру тем же вызовом: смотрим на вспышку чуть позже,
+                // когда её состояние уже точно дошло, и только тогда объявляем камеру
+                main.postDelayed({
+                    if (!started || torchOn) return@postDelayed
                     cam = true
                     IslandBus.camActive.value = true
                     announce()
-                }
+                }, 250)
             }
         }, null)
 
@@ -84,11 +107,10 @@ object PrivacyMonitor {
         hotspotLast = tetheredNow(app)
         IslandBus.hotspotOn.value = hotspotLast
 
-        // Основной путь (Android 11+): публичный TetheringManager присылает tethered-интерфейсы
-        // событием — плашка приходит мгновенно, без опроса. Не вышло (старее/ограничения) — опрос ниже.
-        if (Build.VERSION.SDK_INT >= 30 && registerTetheringEvents(app)) return
-
-        // Резерв: проверка каждые 2 секунды, чтобы плашка приходила почти сразу
+        // Хотспот: TetheringManager — системный класс, обычному приложению недоступен, поэтому
+        // опрос каждые 2 секунды: системный список getTetheredIfaces (скрытый, но стабильный с API 14)
+        // плюс резерв по именам поднятых интерфейсов (ap0/swlan0/softap/rndis/ncm). Плашка приходит
+        // с задержкой не больше пары секунд — на практике сразу после включения раздачи
         pollJob = scope.launch(Dispatchers.Default) {
             while (isActive) {
                 delay(2_000)
@@ -103,30 +125,14 @@ object PrivacyMonitor {
         started = false
         pollJob?.cancel()
         pollJob = null
-        runCatching { tetherCallback?.let { tetherManager?.unregisterTetheringEventCallback(it) } }
-        tetherCallback = null
-        tetherManager = null
+        runCatching { torchCallback?.let { cameraManager?.unregisterTorchCallback(it) } }
+        torchCallback = null
+        cameraManager = null
+        main.removeCallbacksAndMessages(null)
         IslandBus.micActive.value = false
         IslandBus.camActive.value = false
         IslandBus.hotspotOn.value = false
     }
-
-    /** Подписка на события хотспота (публичный API с Android 11). true — опрос не нужен. */
-    private fun registerTetheringEvents(app: Context): Boolean = runCatching {
-        val cm = app.getSystemService(ConnectivityManager::class.java)
-        val tm = runCatching { app.getSystemService(TetheringManager::class.java) }.getOrNull()
-            ?: ConnectivityManager::class.java.getMethod("getTetheringManager").invoke(cm) as? TetheringManager
-            ?: return@runCatching false
-        val cb = object : TetheringManager.TetheringEventCallback() {
-            override fun onTetheredInterfacesChanged(interfaces: List<String>) {
-                setHotspot(interfaces.isNotEmpty())
-            }
-        }
-        tm.registerTetheringEventCallback(ContextCompat.getMainExecutor(app), cb)
-        tetherManager = tm
-        tetherCallback = cb
-        true
-    }.getOrDefault(false)
 
     /** Подключён ли хотспот прямо сейчас: системный список tethered-интерфейсов (скрытый, но стабильный). */
     private fun tetheredNow(context: Context): Boolean = runCatching {
@@ -170,21 +176,40 @@ object PrivacyMonitor {
         val showMic = mic && s.evMic
         val showCam = cam && s.evCamera
         if (!showMic && !showCam) return
-        val title = when {
-            showMic && showCam -> tr("Микрофон и камера", "Mic and camera")
-            showMic -> tr("Микрофон", "Microphone")
-            else -> tr("Камера", "Camera")
+        // У камеры — своя анимация: зелёная пульсирующая линза (NoticeStyle.CAM).
+        // Микрофон показывает прежнюю оранжевую пилюлю с качающимся значком
+        when {
+            showCam && !showMic -> IslandBus.post(
+                Notice(
+                    tr("Камера", "Camera"),
+                    tr("используется приложением", "in use by an app"),
+                    Icons.Rounded.Videocam,
+                    Tints.Green,
+                    style = NoticeStyle.CAM,
+                    extraMs = 800,
+                ),
+            )
+            showCam && showMic -> IslandBus.post(
+                Notice(
+                    tr("Микрофон и камера", "Mic and camera"),
+                    tr("используются приложением", "in use by an app"),
+                    Icons.Rounded.Videocam,
+                    Tints.Green,
+                    style = NoticeStyle.CAM,
+                    extraMs = 800,
+                ),
+            )
+            else -> IslandBus.post(
+                Notice(
+                    tr("Микрофон", "Microphone"),
+                    tr("используется приложением", "in use by an app"),
+                    Icons.Rounded.Mic,
+                    Tints.Orange,
+                    style = NoticeStyle.PILL,
+                    extraMs = 800,
+                ),
+            )
         }
-        IslandBus.post(
-            Notice(
-                title,
-                tr("используется приложением", "in use by an app"),
-                Icons.Rounded.Mic,
-                Tints.Orange,
-                style = NoticeStyle.PILL,
-                extraMs = 800,
-            ),
-        )
     }
 
     private fun isMainCamera(context: Context, cameraId: String): Boolean {

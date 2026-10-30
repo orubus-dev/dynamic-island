@@ -21,6 +21,8 @@ import androidx.compose.material.icons.rounded.AirplanemodeActive
 import androidx.compose.material.icons.rounded.AirplanemodeInactive
 import androidx.compose.material.icons.rounded.Alarm
 import androidx.compose.material.icons.rounded.BatteryAlert
+import androidx.compose.material.icons.rounded.BatteryFull
+import androidx.compose.material.icons.rounded.BatterySaver
 import androidx.compose.material.icons.rounded.BluetoothConnected
 import androidx.compose.material.icons.rounded.Bluetooth
 import androidx.compose.material.icons.rounded.BluetoothDisabled
@@ -30,17 +32,21 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.DoNotDisturbOn
 import androidx.compose.material.icons.rounded.Face
 import androidx.compose.material.icons.rounded.FlashlightOn
+import androidx.compose.material.icons.rounded.Headset
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.LockOpen
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Navigation
 import androidx.compose.material.icons.rounded.Nfc
 import androidx.compose.material.icons.rounded.PowerOff
+import androidx.compose.material.icons.rounded.ScreenRotation
+import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.Usb
 import androidx.compose.material.icons.rounded.UsbOff
 import androidx.compose.material.icons.rounded.Vibration
 import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VpnKey
 import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.material.icons.rounded.WifiOff
 import androidx.compose.material.icons.rounded.WifiTethering
@@ -145,6 +151,9 @@ fun SystemAlertsScreen(onBack: () -> Unit, open: (Screen) -> Unit) {
                 s.evChargeStart, color = Tile.Gray) { set { copy(evChargeStart = it) } }
             GroupToggle(Pos.Middle, Icons.Rounded.PowerOff, tr("Зарядка остановлена", "Charging stopped"), null,
                 s.evChargeStop, color = Tile.Gray) { set { copy(evChargeStop = it) } }
+            GroupToggle(Pos.Middle, Icons.Rounded.BatteryFull, tr("Заряжено", "Charged"),
+                tr("Батарея дошла до 100%", "The battery reached 100%"),
+                s.evCharged, color = Tile.Gray) { set { copy(evCharged = it) } }
             GroupToggle(Pos.Last, Icons.Rounded.BatteryAlert, tr("Низкий заряд", "Low battery"),
                 tr("Когда заряд батареи падает до 5%", "When the battery drops to 5%"),
                 s.evLowBattery, color = Tile.Gray) { set { copy(evLowBattery = it) } }
@@ -161,6 +170,12 @@ fun SystemAlertsScreen(onBack: () -> Unit, open: (Screen) -> Unit) {
                 s.evHeadsetOn, color = Tile.Gray) { set { copy(evHeadsetOn = it) } }
             GroupToggle(Pos.Middle, Icons.Rounded.BluetoothDisabled, tr("Наушники отключены", "Headphones disconnected"), null,
                 s.evHeadsetOff, color = Tile.Gray) { set { copy(evHeadsetOff = it) } }
+            GroupToggle(Pos.Middle, Icons.Rounded.Headset, tr("Проводные наушники", "Wired headphones"),
+                tr("Проводные подключились или ушли", "Wired ones plugged in or out"),
+                s.evWired, color = Tile.Gray) { set { copy(evWired = it) } }
+            GroupToggle(Pos.Middle, Icons.Rounded.VpnKey, tr("VPN", "VPN"),
+                tr("VPN-подключение поднялось или упало", "The VPN tunnel came up or went down"),
+                s.evVpn, color = Tile.Gray) { set { copy(evVpn = it) } }
             GroupToggle(Pos.Middle, Icons.Rounded.Usb, tr("USB-устройство подключено", "USB device connected"), null,
                 s.evUsbOn, color = Tile.Gray) { set { copy(evUsbOn = it) } }
             GroupToggle(Pos.Middle, Icons.Rounded.UsbOff, tr("USB-устройство отключено", "USB device disconnected"), null,
@@ -182,9 +197,15 @@ fun SystemAlertsScreen(onBack: () -> Unit, open: (Screen) -> Unit) {
             GroupToggle(Pos.Middle, Icons.Rounded.Vibration, tr("Режим громкости", "Ring mode"),
                 tr("Звонок, вибрация или без звука", "Ring, vibrate or silent"),
                 s.evRinger, color = Tile.Gray) { set { copy(evRinger = it) } }
-            GroupToggle(Pos.Last, Icons.Rounded.BrightnessAuto, tr("Режим яркости", "Brightness mode"),
+            GroupToggle(Pos.Middle, Icons.Rounded.BrightnessAuto, tr("Режим яркости", "Brightness mode"),
                 tr("Когда включают или выключают адаптивную яркость", "When adaptive brightness is turned on or off"),
                 s.evBrightness, color = Tile.Gray) { set { copy(evBrightness = it) } }
+            GroupToggle(Pos.Middle, Icons.Rounded.ScreenRotation, tr("Автоповорот", "Auto-rotate"),
+                tr("Когда включают или выключают поворот экрана", "When screen rotation is turned on or off"),
+                s.evRotate, color = Tile.Gray) { set { copy(evRotate = it) } }
+            GroupToggle(Pos.Last, Icons.Rounded.BatterySaver, tr("Энергосбережение", "Battery Saver"),
+                tr("Когда Android включает или выключает экономию заряда", "When Android turns power saving on or off"),
+                s.evPowerSave, color = Tile.Gray) { set { copy(evPowerSave = it) } }
         }
 
         SectionHeader(tr("Оплата", "Payments"))
@@ -205,7 +226,10 @@ fun SystemAlertsScreen(onBack: () -> Unit, open: (Screen) -> Unit) {
 
         SectionHeader(tr("Другое", "Other"))
         Group {
-            GroupToggle(Pos.Single, Icons.Rounded.Alarm, tr("Будильник поставлен", "Alarm set"),
+            GroupToggle(Pos.First, Icons.Rounded.Shield, tr("Отчёт щита", "Shield report"),
+                tr("Короткая плашка, когда двойная плашка подавлена", "A short pill whenever a duplicate pop-up is suppressed"),
+                s.evShield, color = Tile.Gray, badge = tr("Новое", "New")) { set { copy(evShield = it) } }
+            GroupToggle(Pos.Last, Icons.Rounded.Alarm, tr("Будильник поставлен", "Alarm set"),
                 tr("Время подъёма и сколько осталось спать", "Wake-up time and how long you can sleep"),
                 s.evAlarmSet, color = Tile.Gray) { set { copy(evAlarmSet = it) } }
         }

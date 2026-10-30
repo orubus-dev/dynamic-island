@@ -6,6 +6,19 @@ Versioning: the second number (1.5, 1.6…) means new and changed features, the 
 
 > Since 1.6.1 the app and the island speak English (Features → General → Language). Earlier versions were in Russian only, so older entries give the Russian label in brackets.
 
+## [1.9.1] — 2026-10-30
+
+- 🧊 **Frosted transitions** — Liquid Glass now lives in the animations: content changes pass through a frosted haze (denser than the usual blur), a sheen sweeps the glass on every event, and the incoming content scales on the elasticity spring. Toggle: Effects → Frosted transitions.
+- 🛡️ **Millisecond duplicate shield** — a repeat banner arriving within 900 ms is killed instantly, even if its text changed; the 4.5 s window for fully identical banners stays. The island can show a short "Shield · duplicate blocked" report (System Alerts → Shield report).
+- 📵 **Popup shield — no more double pop-ups** — system heads-up banners turn off with one button when WRITE_SECURE_SETTINGS is granted. The island now carries its own adb (Shizuku/LADB-style): enter the debugging address and port and it connects by itself (RSA, with the "Allow debugging" dialog) and runs all the shield commands. Screen: Permissions → Popup shield.
+- 📷 **Camera gets its own animation** — instead of the microphone pill, a green lens with a softly pulsing ring, like the iPhone's camera dot. The flashlight no longer fakes a camera: while the flash is on (even from another app), no camera dot appears.
+- ✏️ **Unlock — the whole word** — the Face Unlock small notch clipped the word to "Unloc"; the capsule now widens just enough for the whole "Unlocked" at any system font size.
+- ⚙️ **Settings is back in the dock** — fixed the floating dock layout: the settings icon sits next to Home again instead of sliding off-screen.
+- 🎛️ **Expanded island, under control** — Position and size has new sliders for the big island's shape and size: notice height (70–140%), the expanded corner radius and the maximum expansion width.
+- 🔌 **New events** — VPN connected/disconnected, wired headphones, "Charged" at 100%, auto-rotate and Android battery saver — each with its own toggle.
+- 🫥 **A spring out of the camera** — swipe the last banner away: the island dives into the notch and pops right back out as an idle capsule instead of vanishing.
+- 🧹 **Live clear** — remove a notification in the shade and its island card leaves instantly, not on a timer.
+
 ## [1.9.0] — 2026-10-30
 
 - 🔊 **Volume slider on the island** — long-press the right half of the island and slide: the island morphs into a slim volume bar right above your screen, with a haptic tick on every step. Left half keeps your long-press action ("Gestures" → Split gestures).

@@ -176,6 +176,16 @@ data class IslandSettings(
     val evAlarmSet: Boolean = true,
     /** Точка доступа (хотспот) включилась или выключилась */
     val evHotspot: Boolean = true,
+    /** VPN подключился или отключился */
+    val evVpn: Boolean = true,
+    /** Подключены проводные наушники */
+    val evWired: Boolean = true,
+    /** Телефон зарядился до 100% */
+    val evCharged: Boolean = true,
+    /** Включили или выключили автоповорот */
+    val evRotate: Boolean = false,
+    /** Режим энергосбережения включился или выключился */
+    val evPowerSave: Boolean = true,
     /** Приложение начало использовать микрофон */
     val evMic: Boolean = true,
     /** Приложение начало использовать камеру */
@@ -184,6 +194,8 @@ data class IslandSettings(
     val privacyDots: Boolean = true,
     /** Точки видны и на экране блокировки */
     val dotsOnLockscreen: Boolean = true,
+    /** Отчёт щита: короткая плашка, когда двойная подавлена */
+    val evShield: Boolean = false,
     /** Анимация разблокировки в стиле Face ID (бета) */
     val evFaceUnlock: Boolean = false,
     val faceStyle: FaceStyle = FaceStyle.SMALL,
@@ -209,6 +221,8 @@ data class IslandSettings(
     val radiusSmall: Int = 16,
     /** Радиус углов раскрытого острова и плашек, dp («радиус большого острова») */
     val radiusBig: Int = 44,
+    /** Высота раскрытого острова и плашек в процентах от обычной («высота раскрытого») */
+    val expandedHeightPct: Int = 100,
     /** До какой доли ширины экрана (%) растёт раскрытый остров и плашки — «максимальная ширина» */
     val maxWidthPct: Int = 100,
     // Нет в старых настройках → 1, тогда размеры переносятся на новые
@@ -275,6 +289,8 @@ data class IslandSettings(
     // Эффекты — каждый можно выключить отдельно; «Уменьшить эффекты» выключает их все
     /** Содержимое острова перетекает с размытием (Android 12+) */
     val fxBlur: Boolean = true,
+    /** Морозный переход: с Liquid Glass смена содержимого идёт через морозную дымку и блик стекла */
+    val fxFrost: Boolean = true,
     /** Полоски эквалайзера пляшут под музыку; выключено — стоят ровно, так экономнее */
     val fxEqualizer: Boolean = true,
     /** Частота кадров эквалайзера и свечения: 60 — плавно и вдвое легче, чем 120 у экрана */
@@ -466,8 +482,8 @@ object SettingsRepo {
     fun resetEffects() = update {
         val d = IslandSettings()
         copy(
-            fxBlur = d.fxBlur, fxEqualizer = d.fxEqualizer, fxRate = d.fxRate, fxGlow = d.fxGlow, fxPay = d.fxPay,
-            fxShake = d.fxShake, batterySaver = d.batterySaver,
+            fxBlur = d.fxBlur, fxFrost = d.fxFrost, fxEqualizer = d.fxEqualizer, fxRate = d.fxRate, fxGlow = d.fxGlow,
+            fxPay = d.fxPay, fxShake = d.fxShake, batterySaver = d.batterySaver,
         )
     }
 }

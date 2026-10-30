@@ -64,6 +64,7 @@ import app.orubus.island.core.LangScope
 import app.orubus.island.core.tr
 import app.orubus.island.data.SettingsRepo
 import app.orubus.island.ui.screens.AnimScreen
+import app.orubus.island.ui.screens.AdbScreen
 import app.orubus.island.ui.screens.AppInfoScreen
 import app.orubus.island.ui.screens.BannersScreen
 import app.orubus.island.ui.screens.BanksScreen
@@ -95,7 +96,7 @@ import app.orubus.island.update.UpdateChecker
 
 enum class Screen {
     CARDS, EVENTS, GESTURES, LYRICS, SIZE, COLORS, INSTRUCTION, ABOUT, DIAG, LOOK, ANIM, EFFECTS, BANNERS,
-    PERMISSIONS, TESTS, NOTIFICATIONS, BEHAVIOR, PAYDIAG, KEEPALIVE, BANKS, DISPLAY, WHATSNEW, PRIVACY, FEATURES, BT,
+    PERMISSIONS, TESTS, NOTIFICATIONS, BEHAVIOR, PAYDIAG, KEEPALIVE, BANKS, DISPLAY, WHATSNEW, PRIVACY, FEATURES, BT, ADB,
 }
 
 class MainActivity : ComponentActivity() {
@@ -183,6 +184,7 @@ private fun AppRoot() {
                     Screen.NOTIFICATIONS.name -> NotificationsScreen(back)
                     Screen.BEHAVIOR.name -> BehaviorScreen(back)
                     Screen.BT.name -> BluetoothScreen(back)
+                    Screen.ADB.name -> AdbScreen(back)
                     // Неизвестный ключ (например, экран из старой версии) — пустой слой, не падаем
                     else -> Box(Modifier.fillMaxSize())
                 }

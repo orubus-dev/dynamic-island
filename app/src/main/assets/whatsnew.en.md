@@ -1,8 +1,8 @@
-### Liquid Glass Monochrome
-The app and the island are now black-and-white glass: a floating dock, category cards, and soft state-change animations.
+### Frosted transitions
+Content changes pass through a frosted haze, a sheen sweeps the glass, and scale moves on a spring — Liquid Glass now lives in the animations too.
 
-### Display & Live Alerts
-New sections: style, radii, text scale and fonts — plus mic/camera dots, Face Unlock (beta) and hotspot alerts.
+### The duplicate shield
+A repeat banner within 900 ms dies instantly, and the Popup shield turns off the system heads-up banners — with a built-in adb, Shizuku-style.
 
-### Always alive
-The engine keeps the island running, dedup kills double pop-ups, and swipe now clears notifications from the shade too.
+### Camera and precision
+The camera got its own pulsing green animation, "Unlocked" is no longer clipped, the Settings icon is back in the dock, and the expanded island is editable by height, corners and width.
