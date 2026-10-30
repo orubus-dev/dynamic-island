@@ -12,10 +12,10 @@ on:
 permissions:
   contents: read
 
-# Отпечаток сертификата, которым подписан остров с 1.6.1. Если секрет подменят другим ключом,
-# сборка остановится: иначе у всех перестали бы ставиться обновления.
+# Отпечаток сертификата Orubus Island (свой ключ форка, секрет KEYSTORE_BASE64).
+# Если секрет подменят другим ключом, сборка остановится: иначе обновления перестали бы ставиться.
 env:
-  SIGNING_CERT_SHA256: c691aa99b1d38518d066066fcb31664374f6a21d65180f7c0565c37a073a12dd
+  SIGNING_CERT_SHA256: 96682b9ce5cb209b444c03928e92035690d86d81741539150bf92c6fd3cf1f92
 
 jobs:
   build:
@@ -101,9 +101,9 @@ jobs:
           "$bt/zipalign" -f 4 app/build/outputs/apk/release/app-release-unsigned.apk "$RUNNER_TEMP/aligned.apk"
           "$bt/apksigner" sign --ks "$ks" --ks-type PKCS12 --ks-key-alias island \
             --ks-pass env:KEYSTORE_PASSWORD --key-pass env:KEYSTORE_PASSWORD \
-            --out out/DynamicIsland.apk "$RUNNER_TEMP/aligned.apk"
+            --out out/OrubusIsland.apk "$RUNNER_TEMP/aligned.apk"
           # Потом — что APK подписан именно им (сертификат не секрет, его видно в логе)
-          certs=$("$bt/apksigner" verify --verbose --print-certs out/DynamicIsland.apk)
+          certs=$("$bt/apksigner" verify --verbose --print-certs out/OrubusIsland.apk)
           echo "$certs"
           got=$(awk 'tolower($0) ~ /certificate sha-256 digest:/ {print tolower($NF); exit}' <<<"$certs")
           if [[ "$got" != "$SIGNING_CERT_SHA256" ]]; then
@@ -116,8 +116,8 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: steps.sign.outputs.signed == 'true'
         with:
-          name: DynamicIsland-apk
-          path: out/DynamicIsland.apk
+          name: OrubusIsland-apk
+          path: out/OrubusIsland.apk
           retention-days: 7
 
   release:
@@ -136,7 +136,7 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: DynamicIsland-apk
+          name: OrubusIsland-apk
           path: out
 
       - name: Описание релиза из CHANGELOG.en.md и CHANGELOG.md
@@ -146,10 +146,10 @@ jobs:
           {
             echo "## 🇬🇧 English"
             section CHANGELOG.en.md
-            printf '\n**Install:** download `DynamicIsland.apk` below and open it on your phone. A new version installs over the old one, your settings are kept. **Coming from 1.6.0 or older:** uninstall the old version first — once, because the app now has a new signing key.\n\n---\n\n'
+            printf '\n**Install:** download `OrubusIsland.apk` below and open it on your phone. This is the Orubus build (`app.orubus.island`) — it installs alongside any other island app. A new version installs over the old one, your settings are kept.\n\n---\n\n'
             echo "## 🇷🇺 Русский"
             section CHANGELOG.md
-            printf '\n**Установка:** скачайте `DynamicIsland.apk` ниже и откройте на телефоне. Новая версия ставится поверх старой, настройки сохраняются. **С версии 1.6.0 и старше:** сначала удалите старую версию — один раз, потому что у приложения новый ключ подписи.\n'
+            printf '\n**Установка:** скачайте `OrubusIsland.apk` ниже и откройте на телефоне. Это сборка Orubus (`app.orubus.island`) — она ставится рядом с любым другим приложением острова. Новая версия ставится поверх старой, настройки сохраняются.\n'
           } > notes.md
           cat notes.md
 
@@ -157,10 +157,10 @@ jobs:
       - name: Релиз
         if: needs.build.outputs.release == 'true'
         run: |
-          gh release create "$TAG" out/DynamicIsland.apk -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "Dynamic Island $TAG · Динамический остров" --notes-file notes.md --latest
+          gh release create "$TAG" out/OrubusIsland.apk -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "Orubus Island $TAG · Динамический остров" --notes-file notes.md --latest
 
       - name: Обновить описание вышедшего релиза
         if: needs.build.outputs.update == 'true'
         run: |
-          gh release edit "$TAG" -R "$GITHUB_REPOSITORY" --notes-file notes.md --title "Dynamic Island $TAG · Динамический остров"
+          gh release edit "$TAG" -R "$GITHUB_REPOSITORY" --notes-file notes.md --title "Orubus Island $TAG · Динамический остров"

@@ -6,6 +6,15 @@ Versioning: the second number (1.5, 1.6…) means new and changed features, the 
 
 > Since 1.6.1 the app and the island speak English (Features → General → Language). Earlier versions were in Russian only, so older entries give the Russian label in brackets.
 
+## [1.7.0] — 2026-10-30
+
+- 🏝️ **Orubus Island** — this build now ships as its own app, `app.orubus.island`: its own identity and its own signing key, installing alongside any other island build instead of replacing it.
+- 🫀 **The island stays alive** — a new IslandEngine checks the service every 10 seconds and brings it back when Android kills it; the notification listener re-binds itself, and the island relaunches after a reboot or an app update (Home → Keep the island running).
+- 🩹 **Self-heal after a crash** — if the island process dies, an exact alarm revives it within seconds; enabled once with the one-line adb command shown in the app (Home → Engine status).
+- 🚫 **No more double pop-ups** — identical notifications that arrive twice (the app plus its own banner) collapse into one within a 4.5-second window: a single bubble shows.
+- 🌫️ **Liquid Glass** — while the island is expanded, the window behind it gets a real animated blur (Android 12+), fading from zero to full as the island grows. Toggle in Appearance → Effects.
+- 📊 **Engine status badge** — the keep-alive screen now shows whether the engine is Running / Reviving / Down, with the auto-heal switch and the adb recipe on the same screen.
+
 ## [1.6.5] — 2026-10-28
 
 - 🎬 **Liquid expansion** — new in Appearance → Animations: the content grows together with the island and emerges from a blur; duration and bounce follow your settings.
