@@ -124,7 +124,7 @@ fun SizeScreen(onBack: () -> Unit) {
             Modifier
                 .align(Alignment.BottomCenter)
                 .navigationBarsPadding()
-                .padding(bottom = 24.dp)
+                .padding(bottom = 116.dp)
                 .shadow(12.dp, CircleShape)
                 .clip(CircleShape)
                 .background(Ui.Primary)

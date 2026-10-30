@@ -27,6 +27,7 @@ import androidx.compose.material.icons.rounded.BluetoothDisabled
 import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.BrightnessAuto
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.DarkMode
 import androidx.compose.material.icons.rounded.DoNotDisturbOn
 import androidx.compose.material.icons.rounded.Face
 import androidx.compose.material.icons.rounded.FlashlightOn
@@ -36,6 +37,8 @@ import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Navigation
 import androidx.compose.material.icons.rounded.Nfc
 import androidx.compose.material.icons.rounded.PowerOff
+import androidx.compose.material.icons.rounded.Screenshot
+import androidx.compose.material.icons.rounded.ScreenRotation
 import androidx.compose.material.icons.rounded.Usb
 import androidx.compose.material.icons.rounded.UsbOff
 import androidx.compose.material.icons.rounded.Vibration
@@ -165,6 +168,9 @@ fun SystemAlertsScreen(onBack: () -> Unit, open: (Screen) -> Unit) {
                 s.evUsbOn, color = Tile.Gray) { set { copy(evUsbOn = it) } }
             GroupToggle(Pos.Middle, Icons.Rounded.UsbOff, tr("USB-устройство отключено", "USB device disconnected"), null,
                 s.evUsbOff, color = Tile.Gray) { set { copy(evUsbOff = it) } }
+            GroupToggle(Pos.Middle, Icons.Rounded.Lock, tr("VPN", "VPN"),
+                tr("Когда VPN включается или выключается", "When a VPN turns on or off"),
+                s.evVpnOn && s.evVpnOff, color = Tile.Gray) { v -> set { copy(evVpnOn = v, evVpnOff = v) } }
             GroupItem(Pos.Last, Icons.Rounded.Bluetooth, tr("Свои значки устройств", "Custom device icons"),
                 tr("Своё фото для наушников в плашке и плеере", "Your own photo for headphones in the notice and player"),
                 onClick = { open(Screen.BT) }, color = Tile.Gray, badge = if (s.btIcons.isEmpty()) null else tr("Есть", "Set")) { Arrow() }
@@ -182,9 +188,15 @@ fun SystemAlertsScreen(onBack: () -> Unit, open: (Screen) -> Unit) {
             GroupToggle(Pos.Middle, Icons.Rounded.Vibration, tr("Режим громкости", "Ring mode"),
                 tr("Звонок, вибрация или без звука", "Ring, vibrate or silent"),
                 s.evRinger, color = Tile.Gray) { set { copy(evRinger = it) } }
-            GroupToggle(Pos.Last, Icons.Rounded.BrightnessAuto, tr("Режим яркости", "Brightness mode"),
+            GroupToggle(Pos.Middle, Icons.Rounded.BrightnessAuto, tr("Режим яркости", "Brightness mode"),
                 tr("Когда включают или выключают адаптивную яркость", "When adaptive brightness is turned on or off"),
                 s.evBrightness, color = Tile.Gray) { set { copy(evBrightness = it) } }
+            GroupToggle(Pos.Middle, Icons.Rounded.DarkMode, tr("Тёмная тема", "Dark theme"),
+                tr("Когда телефон переключается между тёмной и светлой темой", "When the phone switches between dark and light theme"),
+                s.evDarkTheme, color = Tile.Gray) { set { copy(evDarkTheme = it) } }
+            GroupToggle(Pos.Last, Icons.Rounded.ScreenRotation, tr("Автоповорот", "Auto-rotate"),
+                tr("Когда включают или выключают автоповорот", "When auto-rotate is turned on or off"),
+                s.evRotate, color = Tile.Gray) { set { copy(evRotate = it) } }
         }
 
         SectionHeader(tr("Оплата", "Payments"))
@@ -205,9 +217,12 @@ fun SystemAlertsScreen(onBack: () -> Unit, open: (Screen) -> Unit) {
 
         SectionHeader(tr("Другое", "Other"))
         Group {
-            GroupToggle(Pos.Single, Icons.Rounded.Alarm, tr("Будильник поставлен", "Alarm set"),
+            GroupToggle(Pos.First, Icons.Rounded.Alarm, tr("Будильник поставлен", "Alarm set"),
                 tr("Время подъёма и сколько осталось спать", "Wake-up time and how long you can sleep"),
                 s.evAlarmSet, color = Tile.Gray) { set { copy(evAlarmSet = it) } }
+            GroupToggle(Pos.Last, Icons.Rounded.Screenshot, tr("Скриншот сделан", "Screenshot taken"),
+                tr("Плашка, когда вы делаете скриншот", "A notice when you take a screenshot"),
+                s.evScreenshot, color = Tile.Gray) { set { copy(evScreenshot = it) } }
         }
     }
 }

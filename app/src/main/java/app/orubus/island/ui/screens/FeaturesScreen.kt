@@ -14,22 +14,27 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Reply
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.ArrowUpward
+import androidx.compose.material.icons.rounded.BatteryChargingFull
 import androidx.compose.material.icons.rounded.Bedtime
 import androidx.compose.material.icons.rounded.ChatBubble
 import androidx.compose.material.icons.rounded.Circle
 import androidx.compose.material.icons.rounded.Dashboard
+import androidx.compose.material.icons.rounded.EmojiEmotions
 import androidx.compose.material.icons.rounded.FormatLineSpacing
 import androidx.compose.material.icons.rounded.Gesture
 import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.LightMode
+import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.NotificationsOff
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.ScreenRotation
+import androidx.compose.material.icons.rounded.SelfImprovement
 import androidx.compose.material.icons.rounded.Smartphone
+import androidx.compose.material.icons.rounded.Speed
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.UnfoldLess
 import androidx.compose.material.icons.rounded.Vibration
@@ -164,6 +169,7 @@ fun FeaturesScreen(open: (Screen) -> Unit) {
 fun BehaviorScreen(onBack: () -> Unit) {
     val s by SettingsRepo.state.collectAsState()
     var collapseDialog by remember { mutableStateOf(false) }
+    var emojiDialog by remember { mutableStateOf(false) }
 
     Page(tr("Поведение", "Behavior"), onBack) {
         SectionHeader(tr("Когда показывать", "When to show"))
@@ -194,6 +200,38 @@ fun BehaviorScreen(onBack: () -> Unit) {
             }
         }
 
+        // Тихие часы: плашки молчат, уведомления остаются в шторке; можно через полночь — с 23 до 8
+        SectionHeader(tr("Тихие часы", "Quiet hours"))
+        Group {
+            GroupToggle(if (s.quietHours) Pos.First else Pos.Single, Icons.Rounded.NotificationsOff, tr("Молчать по ночам", "Quiet at night"),
+                tr("Плашки не показываются с ${hourLabel(s.quietFrom)} до ${hourLabel(s.quietTo)}; музыка, таймеры и звонки живут",
+                    "Notices stay hidden from ${hourLabel(s.quietFrom)} to ${hourLabel(s.quietTo)}; music, timers and calls still show"),
+                s.quietHours, color = Tile.Indigo) { v -> SettingsRepo.update { copy(quietHours = v) } }
+            if (s.quietHours) {
+                GroupSlider(Pos.Middle, Icons.Rounded.Bedtime, tr("С", "From"), s.quietFrom.toFloat(), 0f..23f,
+                    hourLabel(s.quietFrom), steps = 22, color = Tile.Orange) { v -> SettingsRepo.update { copy(quietFrom = v.toInt()) } }
+                GroupSlider(Pos.Last, Icons.Rounded.WbSunny, tr("До", "To"), s.quietTo.toFloat(), 0f..23f,
+                    hourLabel(s.quietTo), steps = 22, color = Tile.Purple) { v -> SettingsRepo.update { copy(quietTo = v.toInt()) } }
+            }
+        }
+
+        // Забота: переверни телефон — и он сам затихнет; напоминание передохнуть
+        SectionHeader(tr("Забота", "Wellbeing"))
+        Group {
+            GroupToggle(Pos.First, Icons.Rounded.ScreenRotation, tr("Переверни, чтобы тихо", "Flip to shhh"),
+                tr("Телефон экраном вниз — «Не беспокоить», перевернули — как было. Нужен доступ к «Не беспокоить»",
+                    "Face down turns on Do Not Disturb, face up restores it. Needs DND access"),
+                s.flipShhh, color = Tile.Purple) { v -> SettingsRepo.update { copy(flipShhh = v) } }
+            GroupSlider(Pos.Middle, Icons.Rounded.SelfImprovement, tr("Пора отдохнуть", "Break reminders"),
+                s.breakMinutes.toFloat(), 0f..120f,
+                if (s.breakMinutes <= 0) tr("Выключено", "Off") else tr("Через ${s.breakMinutes} мин", "After ${s.breakMinutes} min"),
+                steps = 23, color = Tile.Green) { v -> SettingsRepo.update { copy(breakMinutes = Math.round(v)) } }
+            GroupToggle(Pos.Last, Icons.Rounded.Speed, tr("Скорость сети в капсуле", "Network speed in the capsule"),
+                tr("Пустой остров показывает живую скорость Wi-Fi и мобильного интернета",
+                    "The empty capsule shows a live Wi-Fi and mobile data speed"),
+                s.netSpeed, color = Tile.Blue) { v -> SettingsRepo.update { copy(netSpeed = v) } }
+        }
+
         SectionHeader(tr("Раскрытый остров", "Expanded island"))
         Group {
             GroupItem(Pos.First, Icons.Rounded.UnfoldLess, tr("Сворачивать раскрытый остров", "Collapse the expanded island"), collapseLabel(s.autoCollapseSec),
@@ -209,10 +247,13 @@ fun BehaviorScreen(onBack: () -> Unit) {
         // Нажатие на пустой остров: лишние кнопки убираются, а можно не раскрывать его вовсе
         SectionHeader(tr("Пустой остров по нажатию", "Tapping the empty island"))
         Group {
-            GroupToggle(if (s.idleExpand) Pos.First else Pos.Single, Icons.Rounded.UnfoldMore, tr("Раскрывать", "Expand"),
+            GroupToggle(if (s.idleExpand) Pos.First else Pos.Middle, Icons.Rounded.UnfoldMore, tr("Раскрывать", "Expand"),
                 tr("Часы, заряд и кнопки ниже. Выключено — нажатие ничего не делает",
                     "Clock, battery and the buttons below. Off — tapping does nothing"),
                 s.idleExpand, color = Tile.Blue) { v -> SettingsRepo.update { copy(idleExpand = v) } }
+            GroupItem(if (s.idleExpand) Pos.Middle else Pos.Last, Icons.Rounded.EmojiEmotions, tr("Свой эмодзи в капсуле", "Your own emoji in the capsule"),
+                if (s.idleEmoji.isBlank()) tr("Не задан", "Not set") else s.idleEmoji,
+                color = Tile.Pink, onClick = { emojiDialog = true })
             if (s.idleExpand) {
                 QuickAction.entries.forEachIndexed { i, a ->
                     GroupToggle(if (i == QuickAction.entries.lastIndex) Pos.Last else Pos.Middle, a.settingsIcon, a.title,
@@ -239,6 +280,16 @@ fun BehaviorScreen(onBack: () -> Unit) {
     if (collapseDialog) {
         ChoiceDialog(tr("Сворачивать раскрытый остров", "Collapse the expanded island"), listOf(0, 5, 10, 20, 30), s.autoCollapseSec, ::collapseLabel,
             { v -> SettingsRepo.update { copy(autoCollapseSec = v) } }) { collapseDialog = false }
+    }
+
+    if (emojiDialog) {
+        ChoiceDialog(
+            tr("Свой эмодзи в капсуле", "Your own emoji in the capsule"),
+            listOf("", "🏝️", "🌙", "⚡", "🎧", "❤️", "✨", "🔥", "🍎"),
+            s.idleEmoji,
+            { if (it.isBlank()) tr("Без эмодзи", "No emoji") else it },
+            { v -> SettingsRepo.update { copy(idleEmoji = v) } },
+        ) { emojiDialog = false }
     }
 }
 

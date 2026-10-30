@@ -17,7 +17,7 @@ A fork of the excellent [Akira9021/Dynamic-Island-](https://github.com/Akira9021
 
 ---
 
-## ✨ What's new in 1.9.0 — Part 2
+## ✨ What's new in 1.10.0
 
 - 🔊 **Volume slider** — long-press the right half of the island and slide; the island morphs into a slim volume bar with haptic ticks.
 - 🎧 **Bluetooth** — device name + battery in the player, custom photo icons per device (`System Alerts → Connections → Custom device icons`).

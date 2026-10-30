@@ -1,8 +1,8 @@
-### Liquid Glass Monochrome
-The app and the island are now black-and-white glass: a floating dock, category cards, and soft state-change animations.
+### Bigger, smarter, quieter
+Expanded notch height editing, theme presets (Noir/Graphite/Snow/Frost), your own emoji in the capsule, live network speed and the current lyric line.
 
-### Display & Live Alerts
-New sections: style, radii, text scale and fonts — plus mic/camera dots, Face Unlock (beta) and hotspot alerts.
+### New events
+Screenshots get noticed, VPN on/off, dark theme and auto-rotate changes — plus privacy pills that call the app by name (camera now works reliably, via AppOps).
 
-### Always alive
-The engine keeps the island running, dedup kills double pop-ups, and swipe now clears notifications from the shade too.
+### Wellbeing
+Flip to shhh (face down = Do Not Disturb), break reminders, quiet hours — and a frosted blur on every state change. Navigation and the dock are fixed too.

@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.coroutineContext
@@ -79,14 +80,16 @@ private fun springBack(scope: CoroutineScope, state: SwipeState) {
     val animY = Animatable(state.y.floatValue)
     val animA = Animatable(state.alpha.floatValue)
     state.animJob = scope.launch {
-        kotlinx.coroutines.coroutineScope {
-            launch { snapshotFlow { animX.value }.collect { state.x.floatValue = it } }
-            launch { snapshotFlow { animY.value }.collect { state.y.floatValue = it } }
-            launch { snapshotFlow { animA.value }.collect { state.alpha.floatValue = it } }
-            launch { animX.animateTo(0f, spring(dampingRatio = 0.62f, stiffness = Spring.StiffnessMediumLow)) }
-            launch { animY.animateTo(0f, spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMediumLow)) }
-            launch { animA.animateTo(1f, tween(180)) }
-        }
+        // Коллекционеры кадров живут, только пока идут анимации — иначе job не завершается
+        val cx = launch { snapshotFlow { animX.value }.collect { state.x.floatValue = it } }
+        val cy = launch { snapshotFlow { animY.value }.collect { state.y.floatValue = it } }
+        val ca = launch { snapshotFlow { animA.value }.collect { state.alpha.floatValue = it } }
+        listOf(
+            launch { animX.animateTo(0f, spring(dampingRatio = 0.62f, stiffness = Spring.StiffnessMediumLow)) },
+            launch { animY.animateTo(0f, spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMediumLow)) },
+            launch { animA.animateTo(1f, tween(180)) },
+        ).joinAll()
+        cx.cancel(); cy.cancel(); ca.cancel()
         state.reset()
     }
 }
@@ -98,14 +101,15 @@ private fun flyOut(scope: CoroutineScope, state: SwipeState, toX: Float, toY: Fl
     val animY = Animatable(state.y.floatValue)
     val animA = Animatable(state.alpha.floatValue)
     state.animJob = scope.launch {
-        kotlinx.coroutines.coroutineScope {
-            launch { snapshotFlow { animX.value }.collect { state.x.floatValue = it } }
-            launch { snapshotFlow { animY.value }.collect { state.y.floatValue = it } }
-            launch { snapshotFlow { animA.value }.collect { state.alpha.floatValue = it } }
-            launch { animX.animateTo(toX, tween(150)) }
-            launch { animY.animateTo(toY, tween(150)) }
-            launch { animA.animateTo(0f, tween(140)) }
-        }
+        val cx = launch { snapshotFlow { animX.value }.collect { state.x.floatValue = it } }
+        val cy = launch { snapshotFlow { animY.value }.collect { state.y.floatValue = it } }
+        val ca = launch { snapshotFlow { animA.value }.collect { state.alpha.floatValue = it } }
+        listOf(
+            launch { animX.animateTo(toX, tween(150)) },
+            launch { animY.animateTo(toY, tween(150)) },
+            launch { animA.animateTo(0f, tween(140)) },
+        ).joinAll()
+        cx.cancel(); cy.cancel(); ca.cancel()
         after()
         state.reset()
     }

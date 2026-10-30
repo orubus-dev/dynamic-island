@@ -89,6 +89,8 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.net.TrafficStats
+import android.os.SystemClock
 import android.widget.Toast
 import app.orubus.island.core.AppMessage
 import app.orubus.island.core.CallInfo
@@ -112,6 +114,7 @@ import app.orubus.island.core.tr
 import app.orubus.island.ui.Inter
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 /** Цифры одной ширины, чтобы время не «прыгало» */
 val Digits = TextStyle(fontFamily = Inter, fontFeatureSettings = "tnum", fontWeight = FontWeight.SemiBold)
@@ -126,7 +129,7 @@ fun compactGap(s: IslandSettings): Dp = s.cameraGap.dp.coerceAtLeast(8.dp)
 fun sideMax(s: IslandSettings): Dp = activeHeight(s) * 2.6f
 
 /** Высота события: заметно выше свёрнутого острова, как у раскрытых уведомлений iPhone (62 при высоте 37). */
-fun noticeHeight(s: IslandSettings): Dp = (s.height.dp * 1.68f).coerceAtLeast(56.dp)
+fun noticeHeight(s: IslandSettings): Dp = (s.height.dp * 1.68f * (s.bigHeight.coerceIn(80, 180) / 100f)).coerceAtLeast(56.dp)
 
 /** Высота входящего звонка: аватар, имя и две большие кнопки в одну строку (84 при высоте 37). */
 fun callHeight(s: IslandSettings): Dp = (s.height.dp * 2.27f).coerceAtLeast(76.dp)
@@ -144,7 +147,12 @@ fun CompactContent(act: Act, s: IslandSettings, wideWidth: Dp) {
         // Пустая капсула; на экране блокировки слева от камеры — замок
         is Act.Idle -> Box(Modifier.size(s.width.dp, s.height.dp), contentAlignment = Alignment.CenterStart) {
             val keyguard by IslandBus.keyguard.collectAsState()
-            AnimatedVisibility(s.evLock && keyguard, enter = fadeIn() + scaleIn(), exit = fadeOut() + scaleOut()) {
+            // Свой эмодзи/знак в пустой капсуле
+            val emoji = s.idleEmoji.trim()
+            if (emoji.isNotEmpty()) {
+                Text(emoji, fontSize = (s.height.dp.value * 0.55f).sp, modifier = Modifier.padding(start = s.height.dp * 0.3f))
+            }
+            AnimatedVisibility(s.evLock && keyguard && emoji.isEmpty(), enter = fadeIn() + scaleIn(), exit = fadeOut() + scaleOut()) {
                 Icon(Ios.lock, null, tint = Color.White, modifier = Modifier.padding(start = s.height.dp * 0.38f).size(s.height.dp * 0.46f))
             }
             // Точки приватности: микрофон и камера заняты — как индикатор Android, но у острова
@@ -158,7 +166,8 @@ fun CompactContent(act: Act, s: IslandSettings, wideWidth: Dp) {
                 modifier = Modifier.align(Alignment.CenterEnd),
             ) {
                 Row(
-                    Modifier.padding(end = s.height.dp * 0.24f),
+                    // Когда справа живёт скорость сети, точки стоят левее
+                    Modifier.padding(end = if (s.netSpeed) s.height.dp * 1.5f else s.height.dp * 0.24f),
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -166,6 +175,8 @@ fun CompactContent(act: Act, s: IslandSettings, wideWidth: Dp) {
                     if (mic) Box(Modifier.size(s.height.dp * 0.22f).clip(CircleShape).background(Tints.Orange))
                 }
             }
+            // Живая скорость сети — у правого края
+            if (s.netSpeed) NetSpeed(Modifier.align(Alignment.CenterEnd).padding(end = s.height.dp * 0.26f), s.height.dp)
         }
 
         is Act.MediaA -> MediaCompact(act.m, s)
@@ -254,16 +265,29 @@ fun CompactContent(act: Act, s: IslandSettings, wideWidth: Dp) {
             },
         )
 
-        is Act.ChargingA -> CompactRow(h, gap, side * 1.6f,
-            left = { Icon(Ios.flash, null, tint = Tints.Green, modifier = Modifier.size(icon)) },
-            right = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    TimeText("${act.b.level}%", Tints.Green, 15)
-                    Spacer(Modifier.width(5.dp))
-                    BatteryGlyph(act.b.level, Tints.Green, Modifier.size(h * 0.6f, h * 0.3f))
-                }
-            },
-        )
+        is Act.ChargingA -> Box(Modifier.height(h)) {
+            CompactRow(h, gap, side * 1.6f,
+                left = { Icon(Ios.flash, null, tint = Tints.Green, modifier = Modifier.size(icon)) },
+                right = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        TimeText("${act.b.level}%", Tints.Green, 15)
+                        Spacer(Modifier.width(5.dp))
+                        BatteryGlyph(act.b.level, Tints.Green, Modifier.size(h * 0.6f, h * 0.3f))
+                    }
+                },
+            )
+            // Линия прогресса зарядки — вдоль нижней кромки капсулы
+            if (s.chargeProgress) {
+                Box(
+                    Modifier
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth(act.b.level / 100f)
+                        .padding(top = h - 3.dp)
+                        .height(2.dp)
+                        .background(Tints.Green.copy(alpha = 0.85f), RoundedCornerShape(2.dp)),
+                )
+            }
+        }
 
         is Act.LiveA -> LiveCompact(act.l, s)
 
@@ -355,10 +379,66 @@ private fun MediaCompact(m: MediaInfo, s: IslandSettings) {
     CompactRow(h, compactGap(s), sideMax(s),
         left = { Crossfade(m.art, animationSpec = tween(300), label = "art") { Art(it, art, art * 0.24f) } },
         right = {
-            // Пасхалка: вместо эквалайзера бьётся душа
-            if (egg) SoulHeart(Modifier.size(h * 0.5f)) else Equalizer(accent, m.playing, s.liveEqualizer, Modifier.size(h * 0.6f, h * 0.42f))
+            // Текущая строка песни — вместо эквалайзера, если включено
+            val line = if (s.compactLyrics) CurrentLyric(m) else null
+            when {
+                egg -> SoulHeart(Modifier.size(h * 0.5f))
+                line != null -> FitText(
+                    line, Color.White.copy(alpha = 0.92f), 14.sp, 10.sp, FontWeight.Medium,
+                    Modifier.size(width = h * 2.3f, height = h * 0.6f),
+                )
+                else -> Equalizer(accent, m.playing, s.liveEqualizer, Modifier.size(h * 0.6f, h * 0.42f))
+            }
         },
     )
+}
+
+/** Строка песни, звучащая сейчас, — для свёрнутого острова. */
+@Composable
+private fun CurrentLyric(m: MediaInfo): String? {
+    if (!m.playing) return null
+    val lyrics by IslandBus.lyrics.collectAsState()
+    val l = lyrics ?: return null
+    if (l.key != m.key || l.lines.isEmpty()) return null
+    val now = rememberNow(500)
+    val pos = m.positionMs + ((now - m.positionTime).coerceAtLeast(0L) * m.speed).toLong()
+    val i = l.indexAt(pos)
+    return l.lines.getOrNull(i)?.text?.takeIf { it.isNotBlank() }
+}
+
+/** Живая скорость сети: TrafficStats раз в полторы секунды, показывается в пустой капсуле. */
+@Composable
+private fun NetSpeed(modifier: Modifier = Modifier, height: Dp) {
+    var text by remember { mutableStateOf("") }
+    LaunchedEffect(Unit) {
+        var lastRx = TrafficStats.getTotalRxBytes()
+        var lastTx = TrafficStats.getTotalTxBytes()
+        var lastT = SystemClock.elapsedRealtime()
+        while (true) {
+            delay(1500)
+            val rx = TrafficStats.getTotalRxBytes()
+            val tx = TrafficStats.getTotalTxBytes()
+            val t = SystemClock.elapsedRealtime()
+            lastRx = if (rx < 0) 0 else rx
+            lastTx = if (tx < 0) 0 else tx
+            if (rx >= 0 && tx >= 0) {
+                val mbits = ((rx - lastRx) + (tx - lastTx)) * 8f / (t - lastT).coerceAtLeast(1) / 1_000_000f
+                text = when {
+                    mbits >= 9.95f -> "${mbits.roundToInt()} ${tr("Мбит/с", "Mbps")}"
+                    mbits >= 0.995f -> String.format(java.util.Locale.US, "%.1f %s", mbits, tr("Мбит/с", "Mbps"))
+                    else -> "${(mbits * 1000).roundToInt()} ${tr("кбит/с", "kbps")}"
+                }
+            }
+            lastT = t
+        }
+    }
+    if (text.isNotEmpty()) {
+        Text(
+            text, color = Color.White.copy(alpha = 0.9f),
+            fontSize = (height.value * 0.34f).sp, fontWeight = FontWeight.SemiBold,
+            maxLines = 1, softWrap = false, modifier = modifier,
+        )
+    }
 }
 
 /**
@@ -431,7 +511,8 @@ private fun FaceIdNotice(n: Notice, s: IslandSettings) {
                         fontWeight = FontWeight.SemiBold,
                         fontFamily = s.fontFamily.family(),
                     )
-                    Icon(Icons.Rounded.Check, null, tint = Tints.Green, modifier = Modifier.size(h * 0.34f))
+                    // Галочка проявляется штрихом, как в стиле 1 — раньше тут стоял статичный значок
+                    CheckBadge(Tints.Green, animate = true, modifier = Modifier.size(h * 0.4f))
                 }
             },
             shrink = false,

@@ -1,13 +1,14 @@
 package app.orubus.island.service
 
+import android.app.AppOpsManager
 import android.content.Context
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.media.AudioManager
 import android.media.AudioRecordingConfiguration
 import android.net.ConnectivityManager
-import android.net.TetheringManager
 import android.os.Build
+import java.lang.reflect.Proxy
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Face
 import androidx.compose.material.icons.rounded.Mic
@@ -42,13 +43,21 @@ object PrivacyMonitor {
     private var started = false
     private var pollJob: Job? = null
     private var hotspotLast = false
-    private var tetherManager: TetheringManager? = null
-    private var tetherCallback: TetheringManager.TetheringEventCallback? = null
+    private var tetherManager: Any? = null
+    private var tetherProxy: Any? = null
+
+    // Кто именно пишет звук / держит камеру — из AppOps (короткие коды стабильны годами)
+    private const val OP_RECORD_AUDIO = 27
+    private const val OP_CAMERA = 26
+    private var micPkg: String? = null
+    private var camPkg: String? = null
+    private var appContext: Context? = null
 
     fun start(context: Context, scope: CoroutineScope) {
         if (started) return
         started = true
         val app = context.applicationContext
+        appContext = app
 
         val audio = app.getSystemService(Context.AUDIO_SERVICE) as AudioManager
         audio.registerAudioRecordingCallback(object : AudioManager.AudioRecordingCallback() {
@@ -67,18 +76,20 @@ object PrivacyMonitor {
             override fun onCameraAvailable(cameraId: String) {
                 if (isMainCamera(app, cameraId)) {
                     cam = false
-                    IslandBus.camActive.value = false
+                    if (camPkg == null) IslandBus.camActive.value = false
                 }
             }
 
             override fun onCameraUnavailable(cameraId: String) {
                 if (isMainCamera(app, cameraId)) {
                     cam = true
-                    IslandBus.camActive.value = true
+                    if (camPkg == null) IslandBus.camActive.value = true
                     announce()
                 }
             }
         }, null)
+
+        watchAppOps(app)
 
         // Хотспот: сначала текущее состояние (без плашки), дальше — события или опрос.
         hotspotLast = tetheredNow(app)
@@ -103,28 +114,94 @@ object PrivacyMonitor {
         started = false
         pollJob?.cancel()
         pollJob = null
-        runCatching { tetherCallback?.let { tetherManager?.unregisterTetheringEventCallback(it) } }
-        tetherCallback = null
+        runCatching {
+            val tm = tetherManager
+            val proxy = tetherProxy
+            if (tm != null && proxy != null) {
+                tm.javaClass.methods.firstOrNull { it.name == "unregisterTetheringEventCallback" }?.invoke(tm, proxy)
+            }
+        }
+        tetherProxy = null
         tetherManager = null
         IslandBus.micActive.value = false
         IslandBus.camActive.value = false
         IslandBus.hotspotOn.value = false
     }
 
-    /** Подписка на события хотспота (публичный API с Android 11). true — опрос не нужен. */
-    private fun registerTetheringEvents(app: Context): Boolean = runCatching {
-        val cm = app.getSystemService(ConnectivityManager::class.java)
-        val tm = runCatching { app.getSystemService(TetheringManager::class.java) }.getOrNull()
-            ?: ConnectivityManager::class.java.getMethod("getTetheringManager").invoke(cm) as? TetheringManager
-            ?: return@runCatching false
-        val cb = object : TetheringManager.TetheringEventCallback() {
-            override fun onTetheredInterfacesChanged(interfaces: List<String>) {
-                setHotspot(interfaces.isNotEmpty())
+    /** Подписка на активные операции микрофона и камеры: даёт и факт использования, и имя приложения.
+    *  Интерфейс OnOpActiveChangedListener различается между версиями Android — вызываем всё через Proxy. */
+    private fun watchAppOps(app: Context) {
+        runCatching {
+            val ops = app.getSystemService(AppOpsManager::class.java) ?: return
+            val iface = Class.forName("android.app.AppOpsManager\$OnOpActiveChangedListener")
+            val proxy = Proxy.newProxyInstance(iface.classLoader, arrayOf(iface)) { _, method, args ->
+                if (method.name == "onOpActiveChanged" && args != null && args.size >= 4) {
+                    val pkg = args.filterIsInstance<String>().lastOrNull()
+                    val active = args.last() as? Boolean ?: false
+                    val isMic = when (val op = args[0]) {
+                        is Int -> op == OP_RECORD_AUDIO
+                        is String -> op == "android:record_audio"
+                        else -> false
+                    }
+                    if (isMic) {
+                        micPkg = if (active) pkg else null
+                        IslandBus.micActive.value = active
+                        if (active) announce()
+                    } else {
+                        camPkg = if (active) pkg else null
+                        IslandBus.camActive.value = active
+                        if (active) announce()
+                    }
+                }
+                null
+            }
+            val array = intArrayOf(OP_RECORD_AUDIO, OP_CAMERA)
+            // Публичный вариант — с именем вызывающего пакета; на старых версиях — двухаргументный
+            val m3 = runCatching {
+                AppOpsManager::class.java.getMethod("startWatchingActive", IntArray::class.java, String::class.java, iface)
+            }.getOrNull()
+            val m2 = runCatching {
+                AppOpsManager::class.java.getMethod("startWatchingActive", IntArray::class.java, iface)
+            }.getOrNull()
+            when {
+                m3 != null -> m3.invoke(ops, array, app.packageName, proxy)
+                m2 != null -> m2.invoke(ops, array, proxy)
+                else -> return
             }
         }
-        tm.registerTetheringEventCallback(ContextCompat.getMainExecutor(app), cb)
+    }
+
+    /** Человекочитаемое имя приложения по пакету; не вышло — сам пакет. */
+    private fun appLabel(context: Context?, pkg: String?): String? {
+        if (context == null || pkg == null) return null
+        return runCatching {
+            val pm = context.packageManager
+            pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString()
+        }.getOrNull()
+    }
+
+    /** Подписка на события хотспота: TetheringManager — SystemApi, поэтому рефлексия и Proxy.
+    *  true — подписались, опрос не нужен. */
+    private fun registerTetheringEvents(app: Context): Boolean = runCatching {
+        val cm = app.getSystemService(ConnectivityManager::class.java) ?: return@runCatching false
+        val tm = runCatching { app.getSystemService(Class.forName("android.net.TetheringManager")) }.getOrNull()
+            ?: runCatching { ConnectivityManager::class.java.getMethod("getTetheringManager").invoke(cm) }.getOrNull()
+            ?: return@runCatching false
+        val cbClass = Class.forName("android.net.TetheringManager\$TetheringEventCallback")
+        val proxy = Proxy.newProxyInstance(cbClass.classLoader, arrayOf(cbClass)) { _, method, args ->
+            if (method.name == "onTetheredInterfacesChanged") {
+                val list = args?.firstOrNull() as? List<*>
+                setHotspot(!list.isNullOrEmpty())
+            }
+            null
+        }
+        val reg = tm.javaClass.methods.firstOrNull {
+            it.name == "registerTetheringEventCallback" && it.parameterTypes.size == 2 &&
+                java.util.concurrent.Executor::class.java.isAssignableFrom(it.parameterTypes[0])
+        } ?: return@runCatching false
+        reg.invoke(tm, ContextCompat.getMainExecutor(app), proxy)
         tetherManager = tm
-        tetherCallback = cb
+        tetherProxy = proxy
         true
     }.getOrDefault(false)
 
@@ -175,16 +252,29 @@ object PrivacyMonitor {
             showMic -> tr("Микрофон", "Microphone")
             else -> tr("Камера", "Camera")
         }
-        IslandBus.post(
-            Notice(
-                title,
-                tr("используется приложением", "in use by an app"),
-                Icons.Rounded.Mic,
-                Tints.Orange,
-                style = NoticeStyle.PILL,
-                extraMs = 800,
-            ),
-        )
+        // Знаем, кто именно пользуется — зовём по имени
+        val who = appLabel(appContext, micPkg ?: camPkg)
+        if (who != null) {
+            IslandBus.post(
+                Notice(
+                    title,
+                    who,
+                    Icons.Rounded.Mic,
+                    Tints.Orange,
+                ),
+            )
+        } else {
+            IslandBus.post(
+                Notice(
+                    title,
+                    tr("используется приложением", "in use by an app"),
+                    Icons.Rounded.Mic,
+                    Tints.Orange,
+                    style = NoticeStyle.PILL,
+                    extraMs = 800,
+                ),
+            )
+        }
     }
 
     private fun isMainCamera(context: Context, cameraId: String): Boolean {

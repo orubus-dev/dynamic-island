@@ -72,6 +72,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
@@ -564,6 +565,14 @@ private fun IslandBody(
         sheen.snapTo(-1f)
     }
 
+    // Морозное стекло при смене состояния: содержимое на миг размывается и проявляется обратно
+    val frost = remember { Animatable(0f) }
+    LaunchedEffect(primary.id, expanded) {
+        if (!s.fxBlur || s.reduceEffects) return@LaunchedEffect
+        frost.snapTo(1f)
+        frost.animateTo(0f, tween(320, easing = FastOutSlowInEasing))
+    }
+
     // Короткая пилюля (режим звука) вздрагивает вбок, как остров на iPhone при переключении «Звонок/Бесшумно»
     val shake = remember { Animatable(0f) }
     val pillId = (primary as? Act.NoticeA)?.n?.takeIf { it.style == NoticeStyle.PILL }?.id
@@ -761,7 +770,11 @@ private fun IslandBody(
                 change.using(SizeTransform(clip = true) { _, _ -> islandSpec(s) })
             },
         ) { f ->
-            Box(if (s.liquidExpand) liquidFlow(f.key, frames, widths, s) else classicFlow(s)) {
+            Box(
+                (if (s.liquidExpand) liquidFlow(f.key, frames, widths, s) else classicFlow(s))
+                    .graphicsLayer { alpha = 1f - frost.value * 0.12f }
+                    .blur((frost.value * 9).dp),
+            ) {
                 if (f.expanded) {
                     ExpandedContent(f.act, s, lyrics, battery, expandedWidth)
                 } else {

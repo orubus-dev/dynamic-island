@@ -6,6 +6,22 @@ Versioning: the second number (1.5, 1.6…) means new and changed features, the 
 
 > Since 1.6.1 the app and the island speak English (Features → General → Language). Earlier versions were in Russian only, so older entries give the Russian label in brackets.
 
+## [1.10.0] — 2026-10-30
+
+- 📏 **Expanded notch size editing** — the expanded island and notices get their own height slider (80–180%) next to the maximum width, so the big notch finally fits your screen exactly.
+- 📸 **Screenshot events** — take a screenshot and the island shows a short "Screenshot · Saved" notice, just like iOS.
+- 🤫 **Flip to shhh** — put the phone face down and Do Not Disturb turns itself on; flip it back and everything is restored (needs DND access).
+- 🌙 **Quiet hours** — the island stays silent between the hours you set (default 23:00–8:00); music, timers and calls still show, notifications stay in the shade.
+- 🎨 **Theme presets** — Noir, Graphite, Snow and Frost: one tap sets background, text color, glass and border, then fine-tune whatever you like.
+- 😀 **Your own emoji in the capsule** — put any emoji in the empty island, plus a live network-speed readout and the current lyric line while music plays.
+- 🔋 **Charging progress line** — a thin line along the charging notice shows how far the battery has come.
+- 🎥 **Privacy that calls the app by name** — "Camera · WhatsApp" instead of a generic pill; mic and camera detection now runs on AppOps, so the camera event finally works everywhere.
+- 🧭 **Navigation fixed for real** — screens can no longer stack twice (the "stuck in a loop" on Position & Size is gone), and the glass dock with Home and Settings is now reachable from every screen: tap Home or Settings anywhere and the whole stack clears.
+- 👆 **Swipe fixed** — swiping a notification away no longer leaves an invisible island behind (a broken animation job kept the island at zero opacity); the notch now pops back out from the camera cutout after you dismiss.
+- 📶 **Better hotspot** — real TetheringManager events on Android 11+, instant and without polling; the name-based fallback now checks that interfaces are actually up.
+- 🔊 **Volume slider fixed** — the slider now accumulates the whole drag, so it tracks your finger 1:1 instead of jumping ±1.
+- ⚖️ **Open source licenses** — a new screen in Settings credits everything the island is built on. Plus: frosted blur on every island state change, VPN / dark-theme / auto-rotate events, break reminders and Face Unlock style 2's animated check.
+
 ## [1.9.0] — 2026-10-30
 
 - 🔊 **Volume slider on the island** — long-press the right half of the island and slide: the island morphs into a slim volume bar right above your screen, with a haptic tick on every step. Left half keeps your long-press action ("Gestures" → Split gestures).

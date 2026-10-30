@@ -11,8 +11,13 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.res.Configuration
 import android.database.ContentObserver
 import android.graphics.BitmapFactory
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
 import android.media.AudioManager
@@ -21,6 +26,8 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.os.BatteryManager
+import android.os.Environment
+import android.os.FileObserver
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
@@ -64,6 +71,64 @@ class SystemEvents(private val context: Context) {
     private val wifiNetworks = HashSet<Network>()
     /** Когда подключили или отключили зарядку — кабель от компьютера не должен давать вторую плашку «USB» */
     private var lastPowerChange = 0L
+
+    // ── 1.10: VPN, тёмная тема, автоповорот, скриншоты, «переверни, чтобы тихо», «пора отдохнуть» ──
+    private var vpnOn: Boolean? = null
+    private var darkTheme: Boolean? = null
+    private var rotationOn: Boolean? = null
+    private var screenOnAt = 0L
+    private var breakWarned = false
+    private val screenshotWatchers = ArrayList<FileObserver>()
+    private val sensors = context.getSystemService(SensorManager::class.java)
+    private var flipRegistered = false
+    private var shhhDown = false
+    private var shhhAt = 0L
+    private var shhhEngaged = false
+    private var shhhPrevious: Int? = null
+
+    private val vpnCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: Network) {
+            main.post { vpnChanged(true) }
+        }
+
+        override fun onLost(network: Network) {
+            main.post { vpnChanged(false) }
+        }
+    }
+
+    private val rotationObserver = object : ContentObserver(main) {
+        override fun onChange(selfChange: Boolean) = rotationChanged()
+    }
+
+    private val flipListener = object : SensorEventListener {
+        override fun onSensorChanged(event: SensorEvent) {
+            val z = event.values.getOrNull(2) ?: return
+            val down = z < -7f
+            val now = SystemClock.elapsedRealtime()
+            if (down != shhhDown) {
+                shhhDown = down
+                shhhAt = now
+            } else if (now - shhhAt > 1200) {
+                if (down && !shhhEngaged) {
+                    shhhEngaged = true
+                    shhhEngage()
+                } else if (!down && shhhEngaged) {
+                    shhhEngaged = false
+                    shhhDisengage()
+                }
+            }
+        }
+
+        override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
+    }
+
+    /** Раз в полминуты проверяем «Пора отдохнуть», пока экран не гаснет. */
+    private val breakLoop = object : Runnable {
+        override fun run() {
+            checkBreak()
+            if (screenOnAt != 0L) main.postDelayed(this, 30_000)
+        }
+    }
 
     /** Первые секунды после запуска система присылает текущее состояние — это не события. */
     private val warmingUp get() = SystemClock.elapsedRealtime() - startedAt < 3000
@@ -132,6 +197,7 @@ class SystemEvents(private val context: Context) {
             addAction(USB_STATE)
             addAction(NotificationManager.ACTION_INTERRUPTION_FILTER_CHANGED)
             addAction(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED)
+            addAction(Intent.ACTION_CONFIGURATION_CHANGED)
         }
         ContextCompat.registerReceiver(context, receiver, filter, ContextCompat.RECEIVER_EXPORTED)
 
@@ -141,9 +207,28 @@ class SystemEvents(private val context: Context) {
         IslandBus.powerSave.value = power?.isPowerSaveMode == true
         IslandBus.locked.value = isLocked()
         IslandBus.keyguard.value = isKeyguard()
+        screenOnAt = if (IslandBus.screenOn.value) SystemClock.elapsedRealtime() else 0L
+        if (screenOnAt != 0L) main.postDelayed(breakLoop, 30_000)
         brightnessMode = Settings.System.getInt(context.contentResolver, Settings.System.SCREEN_BRIGHTNESS_MODE, 0)
         context.contentResolver.registerContentObserver(
             Settings.System.getUriFor(Settings.System.SCREEN_BRIGHTNESS_MODE), false, brightnessObserver,
+        )
+
+        // Текущее состояние VPN, темы и автоповорота — без плашек, только для сравнения дальше
+        runCatching {
+            val caps = connectivity?.getNetworkCapabilities(connectivity?.activeNetwork)
+            vpnOn = caps?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
+        }
+        runCatching {
+            connectivity?.registerNetworkCallback(
+                NetworkRequest.Builder().addTransportType(NetworkCapabilities.TRANSPORT_VPN).build(),
+                vpnCallback,
+            )
+        }
+        darkTheme = (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+        rotationOn = currentRotation()
+        context.contentResolver.registerContentObserver(
+            Settings.System.getUriFor(Settings.System.ACCELEROMETER_ROTATION), false, rotationObserver,
         )
 
         runCatching {
@@ -152,12 +237,22 @@ class SystemEvents(private val context: Context) {
                 wifiCallback,
             )
         }
+
+        startScreenshotWatchers()
+        syncFlipSensor()
     }
 
     fun stop() {
         runCatching { context.unregisterReceiver(receiver) }
         runCatching { context.contentResolver.unregisterContentObserver(brightnessObserver) }
+        runCatching { context.contentResolver.unregisterContentObserver(rotationObserver) }
         runCatching { connectivity?.unregisterNetworkCallback(wifiCallback) }
+        runCatching { connectivity?.unregisterNetworkCallback(vpnCallback) }
+        runCatching { screenshotWatchers.forEach { it.stopWatching() } }
+        screenshotWatchers.clear()
+        runCatching { sensors?.unregisterListener(flipListener) }
+        flipRegistered = false
+        main.removeCallbacks(breakLoop)
     }
 
     private fun handle(intent: Intent, initialSticky: Boolean) {
@@ -188,19 +283,32 @@ class SystemEvents(private val context: Context) {
 
             Intent.ACTION_SCREEN_OFF -> {
                 IslandBus.screenOn.value = false
+                screenOnAt = 0L
+                main.removeCallbacks(breakLoop)
                 // Блокировка может включиться чуть позже экрана — заранее прячем тексты, если она вообще есть
                 if (keyguard?.isDeviceSecure == true) IslandBus.locked.value = true
                 IslandBus.reply.value = null
                 // Как на iPhone: кнопка питания выключает звонящий таймер
                 if (IslandBus.timer.value?.ringing == true) Controls.cancelTimer()
+                if (shhhEngaged) {
+                    shhhEngaged = false
+                    shhhDisengage()
+                }
+                syncFlipSensor()
                 Controls.collapse()
             }
 
             Intent.ACTION_SCREEN_ON -> {
                 IslandBus.screenOn.value = true
+                screenOnAt = SystemClock.elapsedRealtime()
+                breakWarned = false
+                main.postDelayed(breakLoop, 30_000)
                 IslandBus.locked.value = isLocked()
                 IslandBus.keyguard.value = isKeyguard()
+                syncFlipSensor()
             }
+
+            Intent.ACTION_CONFIGURATION_CHANGED -> themeChanged()
 
             PowerManager.ACTION_POWER_SAVE_MODE_CHANGED ->
                 IslandBus.powerSave.value = context.getSystemService(PowerManager::class.java)?.isPowerSaveMode == true
@@ -347,6 +455,134 @@ class SystemEvents(private val context: Context) {
         val filter = notifications?.currentInterruptionFilter ?: return false
         return filter != NotificationManager.INTERRUPTION_FILTER_ALL &&
             filter != NotificationManager.INTERRUPTION_FILTER_UNKNOWN
+    }
+
+    // ── 1.10: обработчики новых событий ──
+
+    private fun vpnChanged(on: Boolean) {
+        if (on == vpnOn) return
+        vpnOn = on
+        notice(
+            if (on) s.evVpnOn else s.evVpnOff,
+            Notice(tr("VPN", "VPN"), if (on) tr("Включён", "On") else tr("Выключен", "Off"),
+                ic(R.drawable.ios_lock_closed), if (on) Tints.Green else Tints.Gray),
+        )
+    }
+
+    private fun currentRotation(): Boolean = runCatching {
+        Settings.System.getInt(context.contentResolver, Settings.System.ACCELEROMETER_ROTATION, 0) == 1
+    }.getOrDefault(false)
+
+    private fun rotationChanged() {
+        val on = currentRotation()
+        if (on == rotationOn) return
+        rotationOn = on
+        notice(
+            s.evRotate,
+            Notice(tr("Автоповорот", "Auto-rotate"), if (on) tr("Вкл", "On") else tr("Выкл", "Off"),
+                ic(R.drawable.ios_phone_portrait), if (on) Tints.Blue else Tints.Gray),
+        )
+    }
+
+    private fun themeChanged() {
+        val dark = (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+        val prev = darkTheme
+        darkTheme = dark
+        if (prev == null || prev == dark) return
+        notice(
+            s.evDarkTheme,
+            Notice(tr("Тёмная тема", "Dark theme"), if (dark) tr("Вкл", "On") else tr("Выкл", "Off"),
+                ic(R.drawable.ios_moon), if (dark) Tints.Purple else Tints.Gray),
+        )
+    }
+
+    /** Следим за папками «Скриншоты»: появился файл со «screen» в имени — плашка. */
+    private fun startScreenshotWatchers() {
+        val dirs = listOf(
+            java.io.File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "Screenshots"),
+            java.io.File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM), "Screenshots"),
+        ).filter { it.isDirectory }
+        val mask = FileObserver.CREATE or FileObserver.MOVED_TO or FileObserver.CLOSE_WRITE
+        dirs.forEach { dir ->
+            runCatching {
+                object : FileObserver(dir.absolutePath, mask) {
+                    override fun onEvent(event: Int, path: String?) {
+                        if (path == null || event and mask == 0) return
+                        val p = path.lowercase()
+                        if (!p.contains("screen")) return
+                        if (!(p.endsWith(".png") || p.endsWith(".jpg") || p.endsWith(".jpeg"))) return
+                        main.post {
+                            notice(
+                                s.evScreenshot,
+                                Notice(tr("Скриншот", "Screenshot"), tr("Сохранён", "Saved"),
+                                    ic(R.drawable.ios_phone_portrait), Tints.Blue),
+                            )
+                        }
+                    }
+                }.also { it.startWatching(); screenshotWatchers.add(it) }
+            }
+        }
+    }
+
+    private fun syncFlipSensor() {
+        runCatching {
+            val want = s.flipShhh && IslandBus.screenOn.value
+            when {
+                want && !flipRegistered -> {
+                    sensors?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)?.let {
+                        sensors?.registerListener(flipListener, it, SensorManager.SENSOR_DELAY_NORMAL)
+                        flipRegistered = true
+                    }
+                }
+                !want && flipRegistered -> {
+                    sensors?.unregisterListener(flipListener)
+                    flipRegistered = false
+                }
+            }
+        }
+    }
+
+    /** Телефон экраном вниз дольше полуторы секунд — «Не беспокоить». Подняли — как было. */
+    private fun shhhEngage() {
+        runCatching {
+            if (!notifications.isNotificationPolicyAccessGranted) return
+            shhhPrevious = notifications.currentInterruptionFilter
+            notifications.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_PRIORITY)
+            notice(
+                true,
+                Notice(tr("Не беспокоить", "Do Not Disturb"), tr("Телефон экраном вниз", "Phone is face down"),
+                    ic(R.drawable.ios_moon), Tints.Purple, style = NoticeStyle.PILL),
+            )
+        }
+    }
+
+    private fun shhhDisengage() {
+        val prev = shhhPrevious ?: return
+        shhhPrevious = null
+        runCatching {
+            notifications.setInterruptionFilter(prev)
+            notice(
+                true,
+                Notice(tr("Не беспокоить", "Do Not Disturb"), tr("Выключен", "Off"),
+                    ic(R.drawable.ios_moon), Tints.Gray, style = NoticeStyle.PILL),
+            )
+        }
+    }
+
+    private fun checkBreak() {
+        val limit = s.breakMinutes
+        if (limit <= 0 || screenOnAt == 0L || breakWarned) return
+        if (SystemClock.elapsedRealtime() - screenOnAt >= limit * 60_000L) {
+            breakWarned = true
+            notice(
+                true,
+                Notice(
+                    tr("Пора отдохнуть", "Time for a break"),
+                    tr("Экран не гас ", "The screen has been on ") + limit + tr(" мин подряд", " min straight"),
+                    ic(R.drawable.ios_sunny), Tints.Yellow,
+                ),
+            )
+        }
     }
 
     private fun onBattery(intent: Intent) {

@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.AspectRatio
 import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.BorderColor
 import androidx.compose.material.icons.rounded.ChatBubble
 import androidx.compose.material.icons.rounded.ColorLens
@@ -27,8 +28,10 @@ import androidx.compose.material.icons.rounded.DoubleArrow
 import androidx.compose.material.icons.rounded.FormatSize
 import androidx.compose.material.icons.rounded.FontDownload
 import androidx.compose.material.icons.rounded.Gamepad
+import androidx.compose.material.icons.rounded.Height
 import androidx.compose.material.icons.rounded.Layers
 import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.OpenInFull
 import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material.icons.rounded.RoundedCorner
@@ -70,6 +73,7 @@ import app.orubus.island.ui.Page
 import app.orubus.island.ui.RadioDot
 import app.orubus.island.ui.SectionHeader
 import app.orubus.island.ui.SectionLabel
+import app.orubus.island.ui.Pos
 import app.orubus.island.ui.StepperSlider
 import app.orubus.island.ui.Tile
 import app.orubus.island.ui.Ui
@@ -273,9 +277,23 @@ fun DisplayScreen(onBack: () -> Unit, open: (app.orubus.island.ui.Screen) -> Uni
                 posOf(0, 1), Icons.Rounded.OpenInFull, tr("Максимальная ширина", "Big Notch Maximum Width"),
                 s.maxWidthPct.toFloat(), 60f..100f, "${s.maxWidthPct}%", steps = 7, color = Tile.Gray,
             ) { v -> SettingsRepo.update { copy(maxWidthPct = v.toInt()) } }
+            GroupSlider(
+                Pos.Last, Icons.Rounded.Height, tr("Высота раскрытого", "Expanded Notch Height"),
+                s.bigHeight.toFloat(), 80f..180f, "${s.bigHeight}%", steps = 19, color = Tile.Gray,
+            ) { v -> SettingsRepo.update { copy(bigHeight = v.toInt()) } }
+            GroupToggle(
+                Pos.Last, Icons.Rounded.Bolt, tr("Линия зарядки", "Charging progress line"),
+                tr("Тонкая линия прогресса вдоль нижней кромки плашки зарядки", "A thin progress line along the bottom edge of the charging notice"),
+                s.chargeProgress, color = Tile.Green,
+            ) { v -> SettingsRepo.update { copy(chargeProgress = v) } }
+            GroupToggle(
+                Pos.Last, Icons.Rounded.MusicNote, tr("Строка песни на острове", "Lyric line on the island"),
+                tr("Свёрнутый остров показывает строку песни, которая звучит сейчас", "The compact island shows the line that's playing right now"),
+                s.compactLyrics, color = Tile.Purple,
+            ) { v -> SettingsRepo.update { copy(compactLyrics = v) } }
         }
         Text(
-            tr("Насколько широко разворачиваются уведомления и события", "How wide the notch bar expands notifications & alerts"),
+            tr("Насколько широко и высоко разворачиваются уведомления и события", "How wide and tall the notch bar expands notifications & alerts"),
             color = Ui.Sub.copy(alpha = 0.7f), fontSize = 12.sp, modifier = Modifier.padding(start = 6.dp),
         )
 
@@ -296,6 +314,37 @@ fun DisplayScreen(onBack: () -> Unit, open: (app.orubus.island.ui.Screen) -> Uni
                 s.autoBg, color = Tile.Gray, badge = tr("Новое", "New"),
             ) { v -> SettingsRepo.update { copy(autoBg = v) } }
         }
+
+        // ── THEME PRESETS ──
+        SectionLabel(tr("Готовые темы", "Theme presets"))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+            presets.forEachIndexed { i, p ->
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color(p.bg))
+                        .border(1.dp, Ui.GlassBorder, RoundedCornerShape(16.dp))
+                        .clickable {
+                            SettingsRepo.update {
+                                copy(
+                                    color = p.bg, textColor = p.fg, liquidGlass = p.glass,
+                                    glassOpacity = p.opacity, outline = p.rim, outlineColor = p.rimColor,
+                                )
+                            }
+                        }
+                        .padding(vertical = 12.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(p.title, color = Color(p.fg), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                }
+            }
+        }
+        Text(
+            tr("Один тап — и цвет, текст и стекло настроены. Потом можно докрутить руками",
+                "One tap sets color, text and glass. Fine-tune everything after"),
+            color = Ui.Sub.copy(alpha = 0.7f), fontSize = 12.sp, modifier = Modifier.padding(start = 6.dp),
+        )
 
         // ── FONT SIZE ──
         SectionLabel(tr("Размер шрифта", "Font size"))
@@ -591,3 +640,13 @@ private fun LandscapeCard(modifier: Modifier, mode: LandscapeMode, selected: Lan
         RadioDot(on)
     }
 }
+
+/** Готовая тема: цвет фона, текста, стекло и рамка — одним тапом. */
+private data class IslandPreset(val title: String, val bg: Long, val fg: Long, val glass: Boolean, val opacity: Int, val rim: Boolean, val rimColor: Long)
+
+private val presets = listOf(
+    IslandPreset("Noir", 0xFF000000, 0xFFFFFFFF, glass = false, opacity = 68, rim = false, rimColor = 0xFF3A3A40),
+    IslandPreset("Graphite", 0xFF1C1C20, 0xFFF2F2F5, glass = true, opacity = 62, rim = true, rimColor = 0xFF45454E),
+    IslandPreset("Snow", 0xFFF4F4F6, 0xFF111114, glass = false, opacity = 68, rim = true, rimColor = 0xFFD8D8DE),
+    IslandPreset("Frost", 0xFF12121A, 0xFFFFFFFF, glass = true, opacity = 74, rim = true, rimColor = 0xFF54546A),
+)

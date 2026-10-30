@@ -20,19 +20,26 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Bolt
+import androidx.compose.material.icons.rounded.Bedtime
 import androidx.compose.material.icons.rounded.Call
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.DoubleArrow
+import androidx.compose.material.icons.rounded.EmojiEmotions
 import androidx.compose.material.icons.rounded.FlashlightOn
 import androidx.compose.material.icons.rounded.BlurOn
+import androidx.compose.material.icons.rounded.Height
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Navigation
 import androidx.compose.material.icons.rounded.BluetoothAudio
+import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material.icons.rounded.ScreenRotation
+import androidx.compose.material.icons.rounded.Screenshot
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.SportsEsports
 import androidx.compose.material.icons.rounded.Swipe
 import androidx.compose.material.icons.rounded.TextFields
+import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material.icons.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.WifiTethering
 import androidx.compose.material3.Icon
@@ -66,6 +73,41 @@ private data class WhatsNewPage(
 )
 
 private fun pages() = listOf(
+    WhatsNewPage(
+        Icons.Rounded.Height, tr("Размер раскрытого острова", "Expanded notch size"),
+        tr("Высота раскрытого острова теперь настраивается отдельно — вместе с шириной, радиусами и всем остальным в Display.",
+            "The expanded island's height is now its own slider — alongside width, radii and everything else in Display."),
+    ),
+    WhatsNewPage(
+        Icons.Rounded.Screenshot, tr("Скриншот — и остров заметил", "Screenshots get noticed"),
+        tr("Делаете скриншот — остров коротко показывает «Скриншот · Сохранён». Как на iPhone.",
+            "Take a screenshot and the island briefly shows “Screenshot · Saved”. Just like on iPhone."),
+    ),
+    WhatsNewPage(
+        Icons.Rounded.ScreenRotation, tr("Переверни, чтобы тихо", "Flip to shhh"),
+        tr("Телефон экраном вниз — «Не беспокоить» включается сам, перевернули обратно — как было. Нужен доступ к «Не беспокоить».",
+            "Phone face down — Do Not Disturb turns on by itself; flip it back — everything is restored. Needs DND access."),
+    ),
+    WhatsNewPage(
+        Icons.Rounded.Bedtime, tr("Тихие часы", "Quiet hours"),
+        tr("С 23:00 до 8:00 остров молчит, уведомления остаются в шторке. Часы настраиваются.",
+            "From 11 PM to 8 AM the island stays quiet; notifications remain in the shade. Hours are yours to set."),
+    ),
+    WhatsNewPage(
+        Icons.Rounded.Palette, tr("Готовые темы", "Theme presets"),
+        tr("Noir, Graphite, Snow, Frost — один тап ставит цвет фона, текста, стекло и рамку сразу.",
+            "Noir, Graphite, Snow, Frost — one tap sets the background, text, glass and border at once."),
+    ),
+    WhatsNewPage(
+        Icons.Rounded.EmojiEmotions, tr("Свой эмодзи в капсуле", "Your own emoji in the capsule"),
+        tr("Поставьте свой эмодзи в пустой остров, включите живую скорость сети или строку песни — мелочи, которые приятно видеть.",
+            "Put your own emoji in the empty island, add a live network speed or the current lyric line — little things that are nice to see."),
+    ),
+    WhatsNewPage(
+        Icons.Rounded.Videocam, tr("Приватность зовёт по имени", "Privacy calls the app by name"),
+        tr("Камеру включил WhatsApp — остров так и скажет. Определение микрофона и камеры теперь через AppOps: работает и для камеры тоже.",
+            "If WhatsApp opens the camera, the island says so. Mic and camera detection now runs on AppOps — camera events work reliably too."),
+    ),
     WhatsNewPage(
         Icons.Rounded.BlurOn, tr("Liquid Glass Monochrome", "Liquid Glass Monochrome"),
         tr("Приложение и остров теперь в монохромном жидком стекле: стеклянные панели, плавающий док и мягкие анимации состояний.",

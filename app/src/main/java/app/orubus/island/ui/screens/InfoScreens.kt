@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.PrivacyTip
 import androidx.compose.material.icons.rounded.CreditCard
+import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Lightbulb
 import androidx.compose.material.icons.rounded.Navigation
@@ -231,6 +232,9 @@ fun AppInfoScreen(open: (Screen) -> Unit) {
             GroupItem(Pos.Middle, Icons.Rounded.PrivacyTip, tr("Политика конфиденциальности", "Privacy Policy"),
                 tr("Остров ничего не собирает и не отправляет", "The island collects and sends nothing"),
                 onClick = { open(Screen.PRIVACY) }, color = Tile.Gray) { Arrow() }
+            GroupItem(Pos.Middle, Icons.Rounded.Description, tr("Лицензии open source", "Open source licenses"),
+                tr("Чьим трудом построен остров — благодарности и лицензии", "Whose work the island is built on — credits and licenses"),
+                onClick = { open(Screen.LICENSES) }, color = Tile.Gray) { Arrow() }
             GroupItem(Pos.Last, Icons.Rounded.Info, tr("Об острове", "About the island"),
                 tr("Что умеет и откуда идея", "What it does and where the idea comes from"),
                 onClick = { open(Screen.ABOUT) }, color = Tile.Gray) { Arrow() }

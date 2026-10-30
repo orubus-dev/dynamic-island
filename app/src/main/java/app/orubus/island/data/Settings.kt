@@ -359,6 +359,38 @@ data class IslandSettings(
     val btKnown: Map<String, String> = emptyMap(),
     /** Свои значки устройств: MAC → имя файла в filesDir/bt_icons */
     val btIcons: Map<String, String> = emptyMap(),
+
+    // ── 1.10 ──
+    /** Событие: VPN включился */
+    val evVpnOn: Boolean = true,
+    /** Событие: VPN выключился */
+    val evVpnOff: Boolean = false,
+    /** Событие: сменилась тёмная/светлая тема */
+    val evDarkTheme: Boolean = false,
+    /** Событие: включили или выключили автоповорот */
+    val evRotate: Boolean = false,
+    /** Событие: сделан скриншот */
+    val evScreenshot: Boolean = true,
+    /** «Переверни, чтобы тихо»: телефон экраном вниз — «Не беспокоить», обратно — как было */
+    val flipShhh: Boolean = false,
+    /** «Тихие часы»: остров молчит, уведомления остаются в шторке */
+    val quietHours: Boolean = false,
+    /** С которого часа тишина (можно через полночь) */
+    val quietFrom: Int = 23,
+    /** По который час тишина */
+    val quietTo: Int = 8,
+    /** Свой эмодзи/знак в пустой капсуле; пусто — без эмодзи */
+    val idleEmoji: String = "",
+    /** Живая скорость сети в пустой капсуле */
+    val netSpeed: Boolean = false,
+    /** Строка текста песни на свёрнутом острове, пока играет музыка */
+    val compactLyrics: Boolean = false,
+    /** Линия прогресса зарядки на плашке зарядки */
+    val chargeProgress: Boolean = true,
+    /** «Пора отдохнуть»: напоминание после N минут подряд включённого экрана; 0 — выключено */
+    val breakMinutes: Int = 0,
+    /** Высота раскрытого острова и плашек, % от обычной */
+    val bigHeight: Int = 100,
 ) {
     /** С «Экономией заряда» в энергосбережении Android — как с «Уменьшить эффекты» */
     fun forPowerSave(on: Boolean): IslandSettings = if (on && batterySaver && !reduceEffects) copy(reduceEffects = true) else this
@@ -368,6 +400,13 @@ data class IslandSettings(
         !scheduleOn || scheduleFrom == scheduleTo -> true
         scheduleFrom < scheduleTo -> hour in scheduleFrom until scheduleTo
         else -> hour >= scheduleFrom || hour < scheduleTo
+    }
+
+    /** Сейчас тихие часы: остров не показывает плашки (музыка, таймеры и звонки — не плашки, они живут) */
+    fun inQuietHours(hour: Int): Boolean = when {
+        !quietHours || quietFrom == quietTo -> false
+        quietFrom < quietTo -> hour in quietFrom until quietTo
+        else -> hour >= quietFrom || hour < quietTo
     }
 
     /** Отступ острова сверху: у «Как вырез» остров начинается от самого края экрана */

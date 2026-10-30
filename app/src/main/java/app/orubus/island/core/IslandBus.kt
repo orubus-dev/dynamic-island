@@ -122,6 +122,9 @@ object IslandBus {
         private set
 
     fun post(n: Notice) {
+        // Тихие часы: остров молчит — плашки не показываются (уведомления остаются в шторке)
+        val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+        if (SettingsRepo.current.inQuietHours(hour)) return
         val sig = "${n.title}\u0000${n.state}\u0000${n.style}"
         val now = android.os.SystemClock.elapsedRealtime()
         synchronized(recent) {

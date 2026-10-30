@@ -82,6 +82,7 @@ import app.orubus.island.ui.screens.InstructionScreen
 import app.orubus.island.ui.screens.KeepAliveScreen
 import app.orubus.island.ui.screens.LookScreen
 import app.orubus.island.ui.screens.LyricsScreen
+import app.orubus.island.ui.screens.LicensesScreen
 import app.orubus.island.ui.screens.NotificationsScreen
 import app.orubus.island.ui.screens.PayDiagScreen
 import app.orubus.island.ui.screens.PermissionsScreen
@@ -95,7 +96,7 @@ import app.orubus.island.update.UpdateChecker
 
 enum class Screen {
     CARDS, EVENTS, GESTURES, LYRICS, SIZE, COLORS, INSTRUCTION, ABOUT, DIAG, LOOK, ANIM, EFFECTS, BANNERS,
-    PERMISSIONS, TESTS, NOTIFICATIONS, BEHAVIOR, PAYDIAG, KEEPALIVE, BANKS, DISPLAY, WHATSNEW, PRIVACY, FEATURES, BT,
+    PERMISSIONS, TESTS, NOTIFICATIONS, BEHAVIOR, PAYDIAG, KEEPALIVE, BANKS, DISPLAY, WHATSNEW, PRIVACY, FEATURES, BT, LICENSES,
 }
 
 class MainActivity : ComponentActivity() {
@@ -124,12 +125,22 @@ private fun AppRoot() {
     var forward by rememberSaveable { mutableStateOf(true) }
     val stack = remember(stackNames) { stackNames.mapNotNull { n -> runCatching { Screen.valueOf(n) }.getOrNull() } }
     val open: (Screen) -> Unit = {
-        forward = true
-        stackNames = stackNames + it.name
+        // Экран уже сверху стека (двойной тап, сам себя открыл) — не наращиваем стек,
+        // иначе «назад» несколько раз возвращает на тот же экран и кажется зацикленным
+        if (stackNames.lastOrNull() != it.name) {
+            forward = true
+            stackNames = stackNames + it.name
+        }
     }
     val back: () -> Unit = {
         forward = false
         stackNames = stackNames.dropLast(1)
+    }
+    /** Док доступен из любого места: «Домой»/«Настройки» вычищают весь стек и переключают вкладку */
+    val goTab: (Int) -> Unit = { i ->
+        if (stackNames.isNotEmpty()) stackNames = emptyList()
+        forward = false
+        tab = i
     }
     BackHandler(enabled = stackNames.isNotEmpty(), onBack = back)
 
@@ -162,6 +173,7 @@ private fun AppRoot() {
                     Screen.EVENTS.name -> SystemAlertsScreen(back, open)
                     Screen.WHATSNEW.name -> WhatsNewScreen(back)
                     Screen.PRIVACY.name -> PrivacyScreen(back)
+                    Screen.LICENSES.name -> LicensesScreen(back)
                     Screen.FEATURES.name -> FeaturesScreen(open)
                     Screen.CARDS.name -> CardsScreen(back) { open(Screen.INSTRUCTION) }
                     Screen.GESTURES.name -> GesturesScreen(back)
@@ -189,12 +201,12 @@ private fun AppRoot() {
             }
 
             AnimatedVisibility(
-                visible = stackNames.isEmpty(),
+                visible = true,
                 enter = slideInVertically { it } + fadeIn(),
                 exit = slideOutVertically { it } + fadeOut(),
                 modifier = Modifier.align(Alignment.BottomCenter),
             ) {
-                RefractionDock(tab) { tab = it }
+                RefractionDock(tab, goTab)
             }
         }
     }
