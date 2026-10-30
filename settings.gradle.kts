@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "DynamicIsland"
+rootProject.name = "OrubusIsland"
 include(":app")

@@ -6,15 +6,15 @@ plugins {
 }
 
 android {
-    namespace = "com.akira.island"
+    namespace = "app.orubus.island"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.akira.island"
+        applicationId = "app.orubus.island"
         minSdk = 26
         targetSdk = 35
-        versionCode = 12
-        versionName = "1.6.5"
+        versionCode = 13
+        versionName = "1.7.0"
     }
 
     // Ключ подписи в репозитории не хранится: релизный APK собирается без подписи,

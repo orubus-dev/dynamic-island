@@ -5,6 +5,9 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.VIBRATE" />
 
+    <!-- Движок острова: проснуться после сбоя, перезагрузки или обновления приложения -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
     <!-- Таймер острова будит телефон к своему окончанию, даже если экран погашен -->
     <uses-permission
         android:name="android.permission.SCHEDULE_EXACT_ALARM"
@@ -165,5 +168,16 @@
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
         </service>
+
+        <!-- Движок острова: будит службы после сбоя приложения, перезагрузки телефона или обновления.
+             Рассылки системные и защищённые: послать их может только система -->
+        <receiver
+            android:name=".service.Resurrector"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

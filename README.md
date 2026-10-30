@@ -1,182 +1,76 @@
-<p align="center">
-<a href="README.md"><img src="docs/lang/ru-on.svg" height="46" alt="Русский"></a>&nbsp;&nbsp;<a href="README.en.md"><img src="docs/lang/en-off.svg" height="46" alt="English"></a>
-</p>
-
 <div align="center">
 
-# 🏝️ Динамический остров для Android
+# 🏝️ Orubus Island
 
-**Dynamic Island в стиле iPhone над камерой любого Android-смартфона**
+**iPhone-style Dynamic Island for any Android phone — hardened, liquid-glassed, self-healing.**
 
-Уведомления с ответом · навигатор · оплата · музыка с текстом песен · звонки · таймеры · загрузки · зарядка · фонарик · системные события
+A fork of the excellent [Akira9021/Dynamic-Island-](https://github.com/Akira9021/Dynamic-Island-) (upstream README in [README.upstream.md](README.upstream.md)), rebuilt as `app.orubus.island`.
 
-[![Версия 1.6.5](https://img.shields.io/badge/%D0%B2%D0%B5%D1%80%D1%81%D0%B8%D1%8F-1.6.5-C6C3F7?style=for-the-badge&labelColor=1C1B22)](https://github.com/Akira9021/Dynamic-Island-/releases/latest)
-[![Загрузки](https://img.shields.io/github/downloads/Akira9021/Dynamic-Island-/total?style=for-the-badge&label=%D0%B7%D0%B0%D0%B3%D1%80%D1%83%D0%B7%D0%BA%D0%B8&color=34C759&labelColor=1C1B22)](https://github.com/Akira9021/Dynamic-Island-/releases)
-[![Сборка](https://img.shields.io/github/actions/workflow/status/Akira9021/Dynamic-Island-/android.yml?style=for-the-badge&label=%D1%81%D0%B1%D0%BE%D1%80%D0%BA%D0%B0&labelColor=1C1B22)](https://github.com/Akira9021/Dynamic-Island-/actions)
-<br>
+**Notifications with reply · navigation · payments · music with lyrics · calls · timers · downloads · charging · flashlight · system events**
+
 ![Android 8+](https://img.shields.io/badge/Android-8.0%2B-3DDC84?style=flat-square&logo=android&logoColor=white)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.1-7F52FF?style=flat-square&logo=kotlin&logoColor=white)
 ![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?style=flat-square&logo=jetpackcompose&logoColor=white)
-![Без рекламы](https://img.shields.io/badge/%D1%80%D0%B5%D0%BA%D0%BB%D0%B0%D0%BC%D1%8B-0-black?style=flat-square)
-
-<img src="docs/preview.png" width="820" alt="Свёрнутые и раскрытые виды острова: покой, музыка, зарядка, таймер, звонок, плеер с текстом песни, входящий вызов, наушники">
-
-### [⬇️ Скачать последнюю версию](https://github.com/Akira9021/Dynamic-Island-/releases/latest)
-
-[Что нового](#-что-нового-в-162) · [Возможности](#-возможности) · [Установка](#-установка) · [Жесты](#-жесты) · [Настройки](#-настройки) · [Как устроено](#-как-устроено)
+![Package](https://img.shields.io/badge/package-app.orubus.island-34C759?style=flat-square)
 
 </div>
 
 ---
 
-## ✨ Что нового в 1.6.5
+## ✨ What's new in 1.7.0 (the Orubus fork)
 
-- 🎬 **«Жидкое раскрытие»**: содержимое растёт вместе с островом — «Оформление → Анимации»
-- 🎛️ **Свои кнопки** в раскрытом острове или только часы — «Функции → Поведение»
-- 📸 **Скриншот без острова** — кнопкой или жестом
-- 🏦 **Банк не пускает?** Плитка «Остров» в шторке выключает остров на время
-- 📞 **Звонки** на любом языке телефона, входящий смахивается вверх
-- 🫧 **Плавнее свёрнутый остров**: пузырь выходит каплей, эквалайзер — 60 кадров
-- 📌 **«Не выгружать остров»** и **«По расписанию»**
-- 🐞 Исправлены обложка прошлого трека, «будильник» от календарей и «00:00»
+### 🫀 Island Engine — the island can no longer silently die
+Upstream issue #13 ("when the app crashes, it doesn't try to start up again") is fixed with a three-layer resurrection engine:
 
-<div align="center">
-<img src="docs/app.png" width="820" alt="Приложение: «Главная» с пунктом «Чтобы остров не закрывался», «Оформление» с «Упругостью», «Положение и размер» с шириной, высотой и «Как вырез», «Работа в фоне» и «Проверка»">
-</div>
+1. **Heartbeat** — the overlay service beats every 10 s; the keep-alive foreground service watches the pulse.
+2. **Self-healing** — grant `WRITE_SECURE_SETTINGS` once over wireless debugging and the engine flips its own accessibility service off→on when it dies (no more "turn it off and on again" by hand). Without the grant it honestly reports *Island crashed* with a tap-to-fix notification.
+3. **Crash alarm** — uncaught exceptions are intercepted and a 1.5-second exact alarm wakes the process back up. Boot and app-update broadcasts revive it too.
 
-> [!IMPORTANT]
-> С 1.6.0 и старше один раз удалите старую версию: с 1.6.1 у приложения новый ключ подписи.
+Status is visible in **Keep the island running → Island engine**: `Running` / `Reviving` / `Down`, plus a toggle and the one-line adb recipe.
 
-Все изменения — в [CHANGELOG.md](CHANGELOG.md).
+### 🚫 No more double pop-ups
+A dedup gate in the island event bus: an identical banner (title + text + style) re-posted within 4.5 s is swallowed — messenger apps love re-posting the same notification under a new key (read receipts, reactions, summary + child).
 
-## 📱 Возможности
+### 🧊 Liquid Glass, now with real blur on state change
+Upstream's painted glass (specular highlights, tilt-reactive lens rim, chromatic dispersion) now also **blurs what's behind the island while it's expanded** (window blur-behind, Android 12+), and fades back to sharp when collapsed. Graceful no-op on devices without hardware blur.
 
-<div align="center">
-<img src="docs/preview-1.6.1.png" width="820" alt="Остров: «Оплата · К терминалу», «Оплачено» с суммой, будильник и циферблат сна, «Отправлено», карточка новой версии, загрузка с процентами и «Обновлено»">
-</div>
+### 📡 Wireless debugging workflow
+See [Wireless debugging](#-wireless-debugging) — pair once, then install builds and grant the self-healing permission straight from your computer.
 
-<table>
-<tr><th>Карточка</th><th>В капсуле</th><th>По нажатию</th></tr>
-<tr><td>🎵 <b>Музыка</b></td><td>Обложка слева от камеры, звуковая волна в цвет обложки справа</td><td>Обложка, название, синхронный текст песни, перемотка, ⏪ ⏸ ⏩, вывод звука</td></tr>
-<tr><td>📞 <b>Звонки</b></td><td>Входящий — аватар, имя и кнопки сразу; разговор — трубка со временем и волна</td><td>Имя, длительность, «Завершить»</td></tr>
-<tr><td>⏳ <b>Таймер</b></td><td>Песочные часы и обратный отсчёт, последние 10 секунд красным</td><td>Кольцо остатка вокруг паузы, отмена; в конце — звонок и вибрация</td></tr>
-<tr><td>⏱️ <b>Секундомер</b></td><td>Время</td><td>Пауза, сброс, стоп</td></tr>
-<tr><td>⏰ <b>Часы</b></td><td>Таймер или секундомер «Часов» — из уведомления или, если уведомления выключены, с экрана приложения; запись экрана — красным</td><td>Крупное время, пауза, открыть приложение</td></tr>
-<tr><td>🌙 <b>Будильник</b></td><td>За 12 часов до звонка: луна и время подъёма; когда ставите будильник — плашка «Подъём 7:30 · сон 8 ч 15 мин»</td><td>Циферблат сна, как на iPhone: дуга от «сейчас» до будильника, время звонка и сколько осталось спать</td></tr>
-<tr><td>⬇️ <b>Загрузки</b></td><td>Значок приложения и кольцо прогресса (Google Play, Telegram…)</td><td>Название, полоса и проценты</td></tr>
-<tr><td>🔦 <b>Фонарик</b></td><td>Жёлтый значок</td><td>Карточка с лучом как в iOS 18: свайп — яркость (Android 13+), нажатие — выключить</td></tr>
-<tr><td>🔔 <b>Уведомления</b></td><td>Большая плашка: аватар со значком приложения, имя, текст и кнопки «Ответить» / «Пометить прочитанным»</td><td>Ответ прямо в острове; нажатие открывает приложение, свайп вверх убирает</td></tr>
-<tr><td>🧭 <b>Навигация, такси, доставка</b></td><td>Стрелка поворота и расстояние, у такси и доставки — время подачи</td><td>Куда поворачивать, время прибытия, сколько ехать, «Открыть»</td></tr>
-<tr><td>⚡ <b>Зарядка</b></td><td>Молния, проценты и батарейка</td><td>Полоса заряда</td></tr>
-<tr><td>🕐 <b>Пустой остров</b></td><td>Маленькая капсула над камерой</td><td>Часы, дата, заряд, таймер на 1–99 мин, секундомер, фонарик</td></tr>
-</table>
-
-Если активностей две — например, музыка и таймер, — вторая уходит в круглый **пузырь** рядом с островом. Нажатие на пузырь раскрывает её.
-
-### 🔔 События
-
-Короткие уведомления в капсуле, каждое включается отдельно:
-
-| | | |
-| --- | --- | --- |
-| ⚡ Зарядка началась / остановлена | 🪫 Низкий заряд (5%) | 📶 Wi-Fi подключён / отключён |
-| 🎧 Наушники подключены / отключены (с зарядом) | ✈️ Режим полёта | 🔕 Звук / вибрация / без звука |
-| 🔆 Адаптивная яркость | 🔌 USB-устройство | 🔓 Разблокировка |
-| 🌙 Не беспокоить | 💳 Приложите к терминалу | ✅ Оплачено |
-
-## 📥 Установка
-
-1. Скачайте **`DynamicIsland.apk`** со страницы [последнего релиза](https://github.com/Akira9021/Dynamic-Island-/releases/latest) и установите.
-2. Откройте приложение — на «Главной» нажмите **«Открыть спец. возможности»** и включите «Динамический остров».
-   > На Android 13+ появится «Ограниченная настройка»: закройте окно, откройте **О приложении → ⋮ → Разрешить ограниченные настройки** и повторите шаг 2. Пункт в меню «⋮» появляется только после первой попытки.
-3. «Главная» → **Разрешения**: включите **Доступ к уведомлениям** — без него не будет музыки, загрузок и таймеров Часов.
-4. Там же нажмите **Звонки** и разрешите доступ к телефону, журналу звонков и контактам — тогда остров покажет входящий с любой звонилкой.
-5. На Android 12+ разрешите **Bluetooth**, чтобы видеть имена наушников.
-6. **Оформление → Положение и размер** — остров станет красным: сдвиньте его, пока красное не окажется ровно над камерой, и подберите ширину и высоту. Камера-капля — включите **«Как вырез»**.
-
-> [!TIP]
-> Если остров пропадает (Xiaomi и HyperOS, Oppo, realme, Samsung, Infinix…): **Разрешения → Чтобы остров не закрывался** — батарея без ограничений, автозапуск и закрепление в недавних.
-
-### Если не устанавливается
-
-| Что пишет телефон | Что сделать |
-| --- | --- |
-| **«Приложение заблокировано для защиты устройства»** / «Потенциально вредоносное приложение» (Play Защита) | Так Google встречает любое приложение не из Play Маркета, которое просит спец. возможности. Код открыт — его можно проверить. Play Маркет → значок профиля → **Play Защита** → ⚙️ → временно выключите «Сканировать приложения», установите остров и включите обратно |
-| **«Ошибка при синтаксическом анализе пакета»** / «There was a problem parsing the package» | Файл скачан не до конца или открыт не тем приложением. Скачайте `DynamicIsland.apk` со страницы релиза в **Chrome** и откройте его из загрузок Chrome или через **«Файлы» Google**, а не из TikTok, Telegram или загрузчиков видео |
-| **«Приложение не установлено»** поверх старой версии | С 1.6.0 и старше — один раз удалите старую версию: у 1.6.1+ новый ключ подписи |
-| **«Ограниченная настройка»** / «Доступ запрещён» при включении службы | См. шаг 2: **О приложении → ⋮ → Разрешить ограниченные настройки** |
-
-Новые версии ставятся поверх старых, настройки сохраняются (с 1.6.0 и старше — один раз переустановить, см. выше).
-
-## 👆 Жесты
-
-| Действие | Результат |
-| --- | --- |
-| Нажатие | Раскрыть (можно сменить: открыть приложение, пауза, следующий трек, ничего) |
-| Двойное / долгое нажатие | Настраивается, долгое по умолчанию открывает приложение |
-| Потянуть вниз | Раскрыть — капсула тянется за пальцем |
-| Потянуть вверх, нажатие или касание мимо | Свернуть |
-| Толкнуть влево / вправо | Следующий / предыдущий трек |
-| Нажатие на звонящий таймер | Выключить звонок |
-
-## ⚙️ Настройки
-
-Четыре вкладки:
-
-- **Главная** — живой пример, включён ли остров, **разрешения** и **«Проверка»**: все примеры острова на одном экране.
-- **Функции** — что показывает остров и как с ним обращаться:
-  - **Динамические карточки**, **уведомления** и **события** — каждую можно выключить; у уведомлений — кнопки ответа, число строк и цвет кнопок: сиреневый, системный, из аватара или свой.
-  - **Текст песен** — в раскрытом плеере.
-  - **Жесты** и **поведение** — когда показывать и сворачивать остров, кружок второй активности, виброотклик, включение экрана при звонке.
-  - **Системные плашки** — быстрый переход к настройкам Android, где выключаются всплывающие плашки звонилки, «Часов» и батареи, чтобы эти события показывал только остров.
-  - **Язык** — русский или английский, сразу для приложения и острова («Общие → Язык»).
-- **Оформление** — как выглядит остров:
-  - **Положение и размер** — сдвиг по горизонтали, отступ сверху, ширина, высота и «Как вырез»; капсула меняется на экране сразу.
-  - **Размер с активностью** — насколько капсула с активностью толще и шире спокойной, с живым примером.
-  - **Цвет капсулы** — цвет, контур (цвет, толщина, цвет из обложки) и тень.
-  - **Liquid Glass** *(экспериментальный)* — стеклянный остров и карточки, плотность стекла.
-  - **Раскрытие острова** — стиль («Как Фрукт» с эффектом желе, «Пружина», «Плавно», «Без анимации»), длительность, упругость, «Уменьшить эффекты».
-  - **Эффекты** — размытие, живой эквалайзер, вздрагивание, волны оплаты, свечение обложки и экономия заряда.
-- **О приложении** — версия и обновления (автопроверка раз в 3 часа, «Проверить сейчас», «Что нового»), инструкция, диагностика навигации и «Страница GitHub» — ссылка сюда.
-
-## 🧩 Как устроено
-
-<details>
-<summary>Для разработчиков</summary>
-
-<br>
-
-Kotlin, Jetpack Compose, Material 3. Нужны JDK 17 и Android SDK 35.
+## 📡 Wireless debugging
 
 ```bash
-./gradlew assembleDebug     # app/build/outputs/apk/debug/app-debug.apk — для своего телефона
-./gradlew assembleRelease   # app-release-unsigned.apk — релизную подпись ставит CI
+# one-time pairing (Android 11+): Developer options → Wireless debugging → Pair device
+adb pair <PHONE_IP>:<PAIR_PORT>        # enter the 6-digit code
+adb connect <PHONE_IP>:<DEBUG_PORT>
+
+# install a build
+adb install -r app-orubus-island.apk
+
+# let the island heal itself after crashes/reboots (recommended)
+adb shell pm grant app.orubus.island android.permission.WRITE_SECURE_SETTINGS
 ```
 
-Каждый push собирает APK в [GitHub Actions](https://github.com/Akira9021/Dynamic-Island-/actions). Чтобы выпустить новую версию, повысьте `versionName` и `versionCode` в `app/build.gradle.kts` и значок версии в начале обоих README и добавьте раздел `## [x.y.z]` в [CHANGELOG.md](CHANGELOG.md) и [CHANGELOG.en.md](CHANGELOG.en.md) — после push в основную ветку релиз с APK и описанием на двух языках создастся сам. Тег `v*` тоже работает.
+`scripts/orubus-debug.sh` wraps pair/connect/install/logcat for convenience.
 
-| Файл | За что отвечает |
-| --- | --- |
-| `service/IslandService.kt` | Служба спец. возможностей и два окна: рисования (на всю ширину, сквозь него проходят касания) и касаний (невидимое, точно над островом) |
-| `service/NotifListener.kt` | Доступ к уведомлениям: звонки, загрузки, таймеры из уведомлений |
-| `service/MediaMonitor.kt` | Медиасессии любого плеера, обложка и её цвет, текст песен |
-| `service/SystemEvents.kt` | Зарядка, Wi-Fi, наушники, режим полёта, звук, яркость, USB, разблокировка |
-| `lyrics/LyricsRepo.kt` | Текст песен: [LRCLIB](https://lrclib.net), затем NetEase |
-| `service/CallMonitor.kt` | Звонки по состоянию телефона, имя и фото из контактов |
-| `island/IslandOverlay.kt` | Выбор главной активности и пузыря, форма, пружины, жесты |
-| `island/Compact.kt`, `Expanded.kt` | Свёрнутые и раскрытые виды карточек |
-| `ui/` | Приложение настроек |
+## 🔨 Building
 
-Почему два окна: если менять размер окна во время анимации, Android на кадр показывает старую картинку в новом месте — и остров дёргается. Поэтому окно рисования не меняет ширину никогда, а невидимое окно касаний двигается за островом и передаёт касания.
+```bash
+./gradlew assembleDebug        # debug APK, signed with the debug key
+./gradlew assembleRelease      # unsigned; CI signs release builds with its own key
+```
 
-Ключ подписи в репозитории не хранится: Gradle собирает APK без подписи, а подписывает его CI ключом из секретов GitHub (`KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`) и сверяет отпечаток сертификата. Локальная отладочная сборка подписывается обычным отладочным ключом.
+## 🗺️ Roadmap ideas (the "crazy features" board)
 
-</details>
+Pulled from the feature-ideation pass — candidates for future versions:
 
-## 💜 Благодарности
+- **LiveActivities bridge**: mirror web/app live events into the island (orders, streams, builds)
+- **Context pills**: weather on unlock, next calendar event, step count — rotating idle capsule
+- **Beat-synced glass**: FFT-driven refraction shimmer synced to the playing track
+- **Island API**: tiny content-provider so any Orubus app can post into the island
+- **Gesture palette**: double-knock (back-tap) to expand, flip-to-silence with proximity
+- **Theme packs**: seasonal glass tints, Material You-driven dispersion colors
 
-Идея и поведение — из [Dynamic Island для Windows](https://github.com/mihailkotovski/DynamicIsland) (mihailkotovski): пружинные анимации, плеер по клику, толчок вбок для смены трека, таймер с кольцом, текст песен с LRCLIB. Тексты песен — [LRCLIB](https://lrclib.net).
+## 📄 License & credits
 
-<div align="center">
-<sub>Шрифт <a href="https://github.com/rsms/inter">Inter</a> — SIL OFL 1.1 · Иконки <a href="https://ionic.io/ionicons">Ionicons</a> — MIT · Сделано с <a href="https://claude.ai/code">Claude Code</a></sub>
-</div>
+Everything here builds on the original work of [Akira9021](https://github.com/Akira9021) and contributors — see the upstream README and license. Fork changes: Orubus.
