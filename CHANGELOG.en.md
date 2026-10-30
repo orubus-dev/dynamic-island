@@ -6,6 +6,21 @@ Versioning: the second number (1.5, 1.6…) means new and changed features, the 
 
 > Since 1.6.1 the app and the island speak English (Features → General → Language). Earlier versions were in Russian only, so older entries give the Russian label in brackets.
 
+## [1.8.0] — 2026-10-30
+
+- 🫧 **Liquid Glass Monochrome** — the whole app is now a black-and-white glass UI: glass panels with a soft sheen, a floating dock at the bottom (Home on the left, Settings on the right) and big category cards.
+- 🏠 **Home, categorized** — Display, Features and Live Alerts as three glass cards right on the home screen; the engine, permissions and the test bench are one tap away.
+- 🎛️ **Display settings** (new) — capsule/notch style with live shape previews, width/height and horizontal/vertical steppers, small and big corner radius, maximum expanded width, a big-notch preview with sample actions, background and text color, auto background color matched to the app icon, title/subtext/button text scale and the text style: System, Core UI (Inter), Nunito, Lora, Bayon or Mono.
+- 🌫️ **Notch border** — separate small and expanded border toggles plus a border color palette.
+- 📱 **Landscape mode** — "Show in landscape" with Fix Notch (near the camera) and Flexible Notch layouts.
+- 🎮 **Game mode** — hide the island during games or keep notifications flowing, your choice.
+- 🚨 **System Alerts** (new) — flashlight and maps navigation, Face Unlock (beta, Style 1 expanded / Style 2 small notch), phone lock/unlock, mic & camera access dots by the island and recording alerts, hotspot alerts.
+- 📶 **Hotspot in the notch** — the island notices when your hotspot turns on or off.
+- 👆 **Swipe to clear** — swipe a notification up on the island and it clears from the shade too (Gestures).
+- 🫂 **Dual notch** — a second full capsule instead of the little bubble when music and a notification run together.
+- 🌙 **Auto-hide & visibility** — auto-hide the idle island after N seconds, hide it on the lock screen, or hide it while this app is in the foreground; the active island can now grow a little on its own (Auto Expand).
+- 🔒 **Privacy Policy** — a full policy page in Settings; the GitHub page now points at the Orubus repo.
+
 ## [1.7.0] — 2026-10-30
 
 - 🏝️ **Orubus Island** — this build now ships as its own app, `app.orubus.island`: its own identity and its own signing key, installing alongside any other island build instead of replacing it.

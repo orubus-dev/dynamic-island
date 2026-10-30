@@ -20,6 +20,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -35,9 +36,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Info
-import androidx.compose.material.icons.rounded.Palette
-import androidx.compose.material.icons.rounded.Widgets
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
@@ -73,8 +72,8 @@ import app.orubus.island.ui.screens.CapsuleScreen
 import app.orubus.island.ui.screens.CardsScreen
 import app.orubus.island.ui.screens.ColorsScreen
 import app.orubus.island.ui.screens.DiagScreen
+import app.orubus.island.ui.screens.DisplayScreen
 import app.orubus.island.ui.screens.EffectsScreen
-import app.orubus.island.ui.screens.EventsScreen
 import app.orubus.island.ui.screens.FeaturesScreen
 import app.orubus.island.ui.screens.GesturesScreen
 import app.orubus.island.ui.screens.HomeScreen
@@ -86,14 +85,17 @@ import app.orubus.island.ui.screens.LyricsScreen
 import app.orubus.island.ui.screens.NotificationsScreen
 import app.orubus.island.ui.screens.PayDiagScreen
 import app.orubus.island.ui.screens.PermissionsScreen
+import app.orubus.island.ui.screens.PrivacyScreen
 import app.orubus.island.ui.screens.SizeScreen
+import app.orubus.island.ui.screens.SystemAlertsScreen
 import app.orubus.island.ui.screens.TestsScreen
+import app.orubus.island.ui.screens.WhatsNewScreen
 import app.orubus.island.service.KeepAliveService
 import app.orubus.island.update.UpdateChecker
 
 enum class Screen {
     CARDS, EVENTS, GESTURES, LYRICS, SIZE, COLORS, INSTRUCTION, ABOUT, DIAG, LOOK, ANIM, EFFECTS, BANNERS,
-    PERMISSIONS, TESTS, NOTIFICATIONS, BEHAVIOR, PAYDIAG, KEEPALIVE, BANKS,
+    PERMISSIONS, TESTS, NOTIFICATIONS, BEHAVIOR, PAYDIAG, KEEPALIVE, BANKS, DISPLAY, WHATSNEW, PRIVACY, FEATURES,
 }
 
 class MainActivity : ComponentActivity() {
@@ -153,11 +155,13 @@ private fun AppRoot() {
             ) { k ->
                 when (k) {
                     "tab0" -> HomeScreen(open)
-                    "tab1" -> FeaturesScreen(open)
-                    "tab2" -> CapsuleScreen(open)
-                    "tab3" -> AppInfoScreen(open)
+                    "tab1" -> AppInfoScreen(open)
+                    Screen.DISPLAY.name -> DisplayScreen(back, open)
+                    Screen.EVENTS.name -> SystemAlertsScreen(back)
+                    Screen.WHATSNEW.name -> WhatsNewScreen(back)
+                    Screen.PRIVACY.name -> PrivacyScreen(back)
+                    Screen.FEATURES.name -> FeaturesScreen(open)
                     Screen.CARDS.name -> CardsScreen(back) { open(Screen.INSTRUCTION) }
-                    Screen.EVENTS.name -> EventsScreen(back)
                     Screen.GESTURES.name -> GesturesScreen(back)
                     Screen.LYRICS.name -> LyricsScreen(back)
                     Screen.SIZE.name -> SizeScreen(back)
@@ -191,45 +195,40 @@ private fun AppRoot() {
     }
 }
 
-/** Вкладки: главная, что показывает остров, как он выглядит, и о приложении — отдельно от настроек. */
-private fun tabTitles() = listOf(tr("Главная", "Home"), tr("Функции", "Features"), tr("Оформление", "Appearance"), tr("О приложении", "About"))
+/** Плавающий стеклянный док: главная слева, настройки справа. */
+private fun tabTitles() = listOf(tr("Главная", "Home"), tr("Настройки", "Settings"))
 
 @Composable
 private fun BottomBar(selected: Int, onSelect: (Int) -> Unit) {
     val icons = listOf(
         ImageVector.vectorResource(R.drawable.ic_tab_island),
-        Icons.Rounded.Widgets,
-        Icons.Rounded.Palette,
-        Icons.Rounded.Info,
+        Icons.Rounded.Settings,
     )
     Row(
         Modifier
             .navigationBarsPadding()
-            .padding(start = 14.dp, end = 14.dp, bottom = 12.dp)
-            .widthIn(max = 480.dp)
             .fillMaxWidth()
-            .shadow(16.dp, RoundedCornerShape(30.dp))
-            .clip(RoundedCornerShape(30.dp))
-            .background(Ui.Nav)
-            .padding(6.dp),
+            .padding(horizontal = 40.dp, vertical = 12.dp)
+            .shadow(18.dp, RoundedCornerShape(32.dp))
+            .glassCard(RoundedCornerShape(32.dp))
+            .padding(8.dp),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         tabTitles().forEachIndexed { i, title ->
             val on = i == selected
-            val pill by animateColorAsState(if (on) Ui.Primary else Ui.Nav, tween(200), label = "tab")
-            Column(
+            val pill by animateColorAsState(if (on) Ui.Primary else androidx.compose.ui.graphics.Color.Transparent, tween(220), label = "dock")
+            Row(
                 Modifier
-                    .weight(1f)
                     .clip(RoundedCornerShape(24.dp))
+                    .background(pill)
                     .clickable { onSelect(i) }
-                    .padding(vertical = 6.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
+                    .padding(horizontal = 22.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Box(Modifier.size(width = 56.dp, height = 32.dp).clip(CircleShape).background(pill), contentAlignment = Alignment.Center) {
-                    Icon(icons[i], title, tint = if (on) Ui.OnPrimary else Ui.Text, modifier = Modifier.size(24.dp))
-                }
-                Spacer(Modifier.height(4.dp))
-                TabLabel(title, if (on) Ui.Text else Ui.Sub, on)
+                Icon(icons[i], title, tint = if (on) Ui.OnPrimary else Ui.Text, modifier = Modifier.size(22.dp))
+                TabLabel(title, if (on) Ui.OnPrimary else Ui.Sub, on)
             }
         }
     }

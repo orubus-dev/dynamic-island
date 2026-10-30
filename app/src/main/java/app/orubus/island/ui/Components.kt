@@ -1,6 +1,7 @@
 package app.orubus.island.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -47,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.graphics.Color
@@ -72,12 +74,12 @@ fun IslandSwitch(checked: Boolean, onChange: (Boolean) -> Unit, enabled: Boolean
         colors = SwitchDefaults.colors(
             checkedThumbColor = Ui.OnPrimary,
             checkedTrackColor = Ui.Primary,
-            checkedIconColor = Ui.Primary,
+            checkedIconColor = Ui.OnPrimary,
             checkedBorderColor = Ui.Primary,
-            uncheckedThumbColor = Ui.Outline,
-            uncheckedTrackColor = Ui.Bg,
-            uncheckedBorderColor = Ui.Outline,
-            uncheckedIconColor = Ui.Bg,
+            uncheckedThumbColor = Ui.Sub,
+            uncheckedTrackColor = Ui.IconBg,
+            uncheckedBorderColor = Color.Transparent,
+            uncheckedIconColor = Color.Transparent,
         ),
     )
 }
@@ -102,7 +104,7 @@ fun Page(
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (onBack != null) {
                 Box(
-                    Modifier.size(48.dp).clip(CircleShape).background(Ui.Card).clickable(onClick = onBack),
+                    Modifier.size(48.dp).clip(CircleShape).background(Ui.Glass).border(1.dp, Ui.GlassBorder, CircleShape).clickable(onClick = onBack),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(Icons.AutoMirrored.Rounded.ArrowBack, tr("Назад", "Back"), tint = Ui.Text)
@@ -176,8 +178,7 @@ fun ToggleCard(
         Modifier
             .fillMaxWidth()
             .alpha(if (enabled) 1f else 0.45f)
-            .clip(RoundedCornerShape(28.dp))
-            .background(Ui.Card)
+            .glassCard(RoundedCornerShape(28.dp))
             .clickable(enabled = enabled) { onChange(!checked) }
             .padding(horizontal = 16.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -216,6 +217,9 @@ private fun Pos.shape(): Shape = when (this) {
     Pos.Last -> RoundedCornerShape(6.dp, 6.dp, 28.dp, 28.dp)
 }
 
+/** Публичный доступ к форме строки группы — для нестандартных склеек. */
+fun Pos.publicShape(): Shape = shape()
+
 /** Склеенные строки настроек: одна карточка со скруглением сверху и снизу. */
 @Composable
 fun Group(content: @Composable ColumnScope.() -> Unit) {
@@ -249,8 +253,7 @@ fun GroupItem(
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(pos.shape())
-            .background(Ui.Card)
+            .glassCard(pos.shape())
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = 20.dp, vertical = 18.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -289,7 +292,7 @@ fun GroupToggle(
 
 /** Маленькая метка рядом с названием, например «Экспериментальный». */
 @Composable
-fun Badge(text: String, modifier: Modifier = Modifier, color: Color = Tile.Orange) {
+fun Badge(text: String, modifier: Modifier = Modifier, color: Color = Ui.Sub) {
     Text(
         text,
         color = color,
@@ -305,7 +308,7 @@ fun Badge(text: String, modifier: Modifier = Modifier, color: Color = Tile.Orang
 @Composable
 fun IconAction(icon: ImageVector, description: String, onClick: () -> Unit) {
     Box(
-        Modifier.size(48.dp).clip(CircleShape).background(Ui.Card).clickable(onClick = onClick),
+        Modifier.size(48.dp).clip(CircleShape).background(Ui.Glass).border(1.dp, Ui.GlassBorder, CircleShape).clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Icon(icon, description, tint = Ui.Text)
@@ -327,8 +330,7 @@ fun GroupSlider(
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(pos.shape())
-            .background(Ui.Card)
+            .glassCard(pos.shape())
             .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 6.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -369,8 +371,7 @@ fun GroupStepSlider(
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(pos.shape())
-            .background(Ui.Card)
+            .glassCard(pos.shape())
             .padding(start = 20.dp, end = 14.dp, top = 16.dp, bottom = 8.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -422,6 +423,123 @@ private fun StepButton(icon: ImageVector, onClick: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         Icon(icon, null, tint = Ui.Text, modifier = Modifier.size(18.dp))
+    }
+}
+
+/** Стеклянная поверхность: мягкий блик сверху, тонкая светлая кромка, скругление. */
+fun Modifier.glassCard(shape: Shape = RoundedCornerShape(24.dp)): Modifier = this
+    .clip(shape)
+    .background(Ui.Glass)
+    .border(1.dp, Ui.GlassBorder, shape)
+
+/** Подпись-разделитель секции: маленькие серые капсы, как в референсе. */
+@Composable
+fun SectionLabel(text: String) {
+    Text(
+        text.uppercase(),
+        color = Ui.Sub.copy(alpha = 0.75f),
+        fontSize = 12.sp,
+        fontWeight = FontWeight.SemiBold,
+        letterSpacing = 1.2.sp,
+        modifier = Modifier.padding(start = 6.dp, top = 6.dp),
+    )
+}
+
+/** Крупная категория на главном экране: стеклянная карточка с значком и стрелкой. */
+@Composable
+fun GlassCategory(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .glassCard(RoundedCornerShape(26.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 20.dp, vertical = 20.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier.size(52.dp).clip(RoundedCornerShape(18.dp)).background(Ui.IconBg).border(1.dp, Ui.GlassHi, RoundedCornerShape(18.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(icon, null, tint = Ui.Text, modifier = Modifier.size(26.dp))
+        }
+        Spacer(Modifier.width(16.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, color = Ui.Text, fontSize = 19.sp, fontWeight = FontWeight.Bold, lineHeight = 23.sp)
+            Text(subtitle, color = Ui.Sub, fontSize = 14.sp, lineHeight = 17.sp)
+        }
+        Icon(Icons.AutoMirrored.Rounded.ArrowBack, null, tint = Ui.Sub, modifier = Modifier.size(20.dp).rotate(180f))
+    }
+}
+
+/** Круглая радио-кнопка выбора (стили, режимы) — как в референсе. */
+@Composable
+fun RadioDot(selected: Boolean) {
+    Box(
+        Modifier.size(24.dp).clip(CircleShape).border(2.dp, if (selected) Ui.Primary else Ui.Divider, CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (selected) Box(Modifier.size(12.dp).clip(CircleShape).background(Ui.Primary))
+    }
+}
+
+/** Ряд чипов-переключателей (шрифты и т.п.). */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun ChipRow(options: List<String>, selected: String, onPick: (String) -> Unit) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        options.forEach { o ->
+            val on = o == selected
+            Box(
+                Modifier
+                    .clip(CircleShape)
+                    .then(if (on) Modifier.background(Ui.Primary) else Modifier.background(Ui.Glass))
+                    .border(1.dp, if (on) Ui.Primary else Ui.GlassBorder, CircleShape)
+                    .clickable { onPick(o) }
+                    .padding(horizontal = 18.dp, vertical = 10.dp),
+            ) {
+                Text(o, color = if (on) Ui.OnPrimary else Ui.Text, fontSize = 15.sp, fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal)
+            }
+        }
+    }
+}
+
+/** Компактный степпер-слайдер без значка — строки Width/Height из референса. */
+@Composable
+fun StepperSlider(
+    label: String,
+    value: Int,
+    range: IntRange,
+    unit: String = "",
+    onChange: (Int) -> Unit,
+) {
+    val view = androidx.compose.ui.platform.LocalView.current
+    fun tick() = view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(label, color = Ui.Text, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(96.dp))
+        StepButton(Icons.Rounded.Remove) {
+            tick(); onChange((value - 1).coerceAtLeast(range.first))
+        }
+        Slider(
+            value = value.toFloat().coerceIn(range.first.toFloat(), range.last.toFloat()),
+            onValueChange = { v -> val next = Math.round(v); if (next != value) onChange(next) },
+            valueRange = range.first.toFloat()..range.last.toFloat(),
+            colors = SliderDefaults.colors(thumbColor = Ui.Primary, activeTrackColor = Ui.Primary, inactiveTrackColor = Ui.IconBg),
+            modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+        )
+        StepButton(Icons.Rounded.Add) {
+            tick(); onChange((value + 1).coerceAtMost(range.last))
+        }
+    }
+    if (unit.isNotEmpty()) {
+        Text(
+            "$value $unit", color = Ui.Sub, fontSize = 13.sp,
+            modifier = Modifier.padding(start = 96.dp + 44.dp, top = 0.dp),
+        )
     }
 }
 

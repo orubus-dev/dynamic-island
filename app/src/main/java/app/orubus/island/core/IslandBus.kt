@@ -70,6 +70,14 @@ object IslandBus {
     val keyguard = MutableStateFlow(false)
     /** Открыт экран «Размер и положение»: остров красный, чтобы подогнать его под камеру */
     val calibrating = MutableStateFlow(false)
+    /** Какое-то приложение сейчас пишет звук (PrivacyMonitor) */
+    val micActive = MutableStateFlow(false)
+    /** Какое-то приложение сейчас держит камеру (PrivacyMonitor) */
+    val camActive = MutableStateFlow(false)
+    /** Точка доступа (хотспот) включена (PrivacyMonitor) */
+    val hotspotOn = MutableStateFlow(false)
+    /** На переднем плане игра — для игрового режима */
+    val gameForeground = MutableStateFlow(false)
     /** Играет та самая песня — остров празднует (пасхалка, Egg.kt) */
     val egg = MutableStateFlow(false)
     /** Последнее касание раскрытого острова — чтобы не сворачивать его из-под пальца */

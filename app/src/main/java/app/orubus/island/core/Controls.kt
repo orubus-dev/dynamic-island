@@ -7,6 +7,8 @@ import android.content.Intent
 import android.os.Build
 import android.provider.Settings
 import android.telecom.TelecomManager
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ChatBubble
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import android.media.session.MediaController
@@ -17,6 +19,29 @@ import android.os.SystemClock
 object Controls {
     @Volatile
     var mediaController: MediaController? = null
+
+    /** Пробное сообщение из карусели «Что нового»: смахните вверх — уйдёт и из шторки, если включено. */
+    fun postDemoMessage() {
+        IslandBus.post(
+            Notice(
+                "",
+                null,
+                Icons.Rounded.ChatBubble,
+                Tints.Blue,
+                style = NoticeStyle.MESSAGE,
+                message = AppMessage(
+                    key = "demo-swipe",
+                    pkg = "app.orubus.island",
+                    appName = tr("Чатапп", "ChatApp"),
+                    text = tr("Смахни меня вверх — я исчезну и из шторки!", "Swipe me up — I'll clear from the shade too!"),
+                    avatar = null,
+                    appIcon = null,
+                    intent = null,
+                ),
+                extraMs = 4000,
+            ),
+        )
+    }
 
     // Подставляет IslandService, пока он запущен
     var torchOn: () -> Unit = {}

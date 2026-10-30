@@ -25,6 +25,26 @@ import app.orubus.island.data.SettingsRepo
 class NotifListener : NotificationListenerService() {
     private var media: MediaMonitor? = null
 
+    init {
+        instance = this
+    }
+
+    override fun onDestroy() {
+        if (instance === this) instance = null
+        super.onDestroy()
+    }
+
+    companion object {
+        @Volatile
+        var instance: NotifListener? = null
+            private set
+
+        /** Убрать уведомление из шторки — для «Смахнул уведомление — убрать его и в шторке». */
+        fun cancelKey(key: String) {
+            runCatching { instance?.cancelNotification(key) }
+        }
+    }
+
     override fun onListenerConnected() {
         SettingsRepo.init(this)
         media = MediaMonitor(applicationContext).also { it.start() }

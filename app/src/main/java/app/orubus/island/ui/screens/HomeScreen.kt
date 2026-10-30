@@ -32,18 +32,22 @@ import androidx.compose.material.icons.rounded.AccessibilityNew
 import androidx.compose.material.icons.rounded.Alarm
 import androidx.compose.material.icons.rounded.Bluetooth
 import androidx.compose.material.icons.rounded.Bolt
+import androidx.compose.material.icons.rounded.Campaign
 import androidx.compose.material.icons.rounded.Call
 import androidx.compose.material.icons.rounded.ChatBubble
 import androidx.compose.material.icons.rounded.HourglassBottom
 import androidx.compose.material.icons.rounded.Lightbulb
 import androidx.compose.material.icons.rounded.Navigation
+import androidx.compose.material.icons.rounded.NewReleases
 import androidx.compose.material.icons.rounded.Nfc
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.NotificationsOff
 import androidx.compose.material.icons.rounded.PowerSettingsNew
 import androidx.compose.material.icons.rounded.Science
 import androidx.compose.material.icons.rounded.SystemUpdate
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.VerifiedUser
+import androidx.compose.material.icons.rounded.Widgets
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -88,6 +92,7 @@ import app.orubus.island.island.rememberHaptic
 import app.orubus.island.service.NotificationParser
 import app.orubus.island.service.SystemBanners
 import app.orubus.island.ui.Group
+import app.orubus.island.ui.GlassCategory
 import app.orubus.island.ui.GroupItem
 import app.orubus.island.ui.ItemIcon
 import app.orubus.island.ui.Page
@@ -140,8 +145,8 @@ private fun rememberPermState(): Pair<PermState, () -> Unit> {
 }
 
 /**
- * «Главная»: живой пример, включён ли остров, разрешения и проверка. Всё, что настраивается, —
- * во вкладках «Функции» и «Оформление», версия и помощь — в «О приложении».
+ * «Главная»: живой пример, включён ли остров и большие категории — Display, Features, Live Alerts.
+ * Движок, разрешения и проверка — рядом, версия и помощь — в «Настройках» (в доке справа внизу).
  */
 @Composable
 fun HomeScreen(open: (Screen) -> Unit) {
@@ -153,12 +158,36 @@ fun HomeScreen(open: (Screen) -> Unit) {
 
     Page(tr("Динамический остров", "Dynamic Island")) {
         IslandPreview()
-        UpdateSection()
 
         // Без службы спец. возможностей острова нет вовсе — это первый шаг
         if (!perms.accessibility) {
             StartCard(onOpen = { Perms.openAccessibility(context) }, onHelp = { open(Screen.INSTRUCTION) })
         }
+
+        ToggleCard(
+            Icons.Rounded.PowerSettingsNew,
+            tr("Остров включён", "Island on"),
+            when {
+                !perms.accessibility -> tr("Сначала включите службу в спец. возможностях", "First turn on the service in Accessibility")
+                running -> tr("Капсула показывается над камерой", "The capsule shows over the camera")
+                else -> tr("Служба запускается…", "The service is starting…")
+            },
+            s.enabled,
+        ) { v -> SettingsRepo.update { copy(enabled = v) } }
+
+        // ── Категории ──
+        GlassCategory(
+            Icons.Rounded.Tune, tr("Display", "Display"),
+            tr("Стиль, размер, радиусы, текст, рамка, игры", "Style, size, radii, text, border, games"),
+        ) { open(Screen.DISPLAY) }
+        GlassCategory(
+            Icons.Rounded.Widgets, tr("Функции", "Features"),
+            tr("Карточки, уведомления, жесты, поведение", "Cards, notifications, gestures, behavior"),
+        ) { open(Screen.FEATURES) }
+        GlassCategory(
+            Icons.Rounded.Campaign, tr("Живые оповещения", "Live Alerts"),
+            tr("Фонарик, навигация, Face Unlock, приватность", "Flashlight, navigation, Face Unlock, privacy"),
+        ) { open(Screen.EVENTS) }
 
         // Сообщение пришло и в остров, и своей плашкой мессенджера — подсказываем один раз, как убрать вторую
         val popUp by SystemBanners.popUp.collectAsState()
@@ -171,32 +200,28 @@ fun HomeScreen(open: (Screen) -> Unit) {
             )
         }
 
-        ToggleCard(
-            Icons.Rounded.PowerSettingsNew,
-            tr("Остров включён", "Island on"),
-            when {
-                !perms.accessibility -> tr("Сначала включите службу в спец. возможностях", "First turn on the service in Accessibility")
-                running -> tr("Капсула показывается над камерой", "The capsule shows over the camera")
-                else -> tr("Служба запускается…", "The service is starting…")
-            },
-            s.enabled, color = Tile.Green,
-        ) { v -> SettingsRepo.update { copy(enabled = v) } }
-
         Group {
+            // На виду: на Xiaomi, Oppo, Samsung остров иначе пропадает, и люди не знают почему
+            KeepAliveItem(Pos.First, open)
             GroupItem(
-                Pos.First, Icons.Rounded.VerifiedUser, tr("Разрешения", "Permissions"),
+                Pos.Middle, Icons.Rounded.NewReleases, tr("Что нового", "What's New"),
+                tr("10 коротких страниц обо всём новом", "10 short pages about everything new"),
+                color = Tile.Gray, badge = tr("Новое", "New"), onClick = { open(Screen.WHATSNEW) },
+            ) { Arrow() }
+            GroupItem(
+                Pos.Middle, Icons.Rounded.VerifiedUser, tr("Разрешения", "Permissions"),
                 if (missing.isEmpty()) tr("Всё включено", "All granted") else tr("Нужно включить: ", "Needed: ") + missing.joinToString(", "),
-                color = if (missing.isEmpty()) Tile.Green else Tile.Orange,
+                color = if (missing.isEmpty()) Tile.Gray else Tile.Gray,
                 onClick = { open(Screen.PERMISSIONS) },
             ) { if (missing.isEmpty()) Arrow() else CountBadge(missing.size) }
-            // На виду: на Xiaomi, Oppo, Samsung остров иначе пропадает, и люди не знают почему
-            KeepAliveItem(Pos.Middle, open)
             // И про банки, которые не пускают, пока остров включён
-            BanksItem(Pos.Middle, open)
+            BanksItem(Pos.Last, open)
+        }
+        Group {
             GroupItem(
-                Pos.Last, Icons.Rounded.Science, tr("Проверка", "Try it"),
+                Pos.Single, Icons.Rounded.Science, tr("Проверка", "Try it"),
                 tr("Событие, сообщение, звонок, оплата — прямо в острове", "An event, message, call, payment — right in the island"),
-                color = Tile.Purple, onClick = { open(Screen.TESTS) },
+                color = Tile.Gray, onClick = { open(Screen.TESTS) },
             ) { Arrow() }
         }
     }

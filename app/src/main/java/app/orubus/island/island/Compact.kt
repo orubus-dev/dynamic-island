@@ -29,6 +29,8 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Face
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -102,6 +104,7 @@ import app.orubus.island.core.NoticeStyle
 import app.orubus.island.core.Tints
 import app.orubus.island.core.formatDuration
 import app.orubus.island.data.IslandSettings
+import app.orubus.island.data.FaceStyle
 import app.orubus.island.data.SettingsRepo
 import app.orubus.island.service.Messages
 import androidx.compose.runtime.collectAsState
@@ -143,6 +146,25 @@ fun CompactContent(act: Act, s: IslandSettings, wideWidth: Dp) {
             val keyguard by IslandBus.keyguard.collectAsState()
             AnimatedVisibility(s.evLock && keyguard, enter = fadeIn() + scaleIn(), exit = fadeOut() + scaleOut()) {
                 Icon(Ios.lock, null, tint = Color.White, modifier = Modifier.padding(start = s.height.dp * 0.38f).size(s.height.dp * 0.46f))
+            }
+            // Точки приватности: микрофон и камера заняты — как индикатор Android, но у острова
+            val mic by IslandBus.micActive.collectAsState()
+            val cam by IslandBus.camActive.collectAsState()
+            val lockedNow by IslandBus.locked.collectAsState()
+            AnimatedVisibility(
+                (mic || cam) && s.privacyDots && (!lockedNow || s.dotsOnLockscreen),
+                enter = fadeIn() + scaleIn(),
+                exit = fadeOut() + scaleOut(),
+                modifier = Modifier.align(Alignment.CenterEnd),
+            ) {
+                Row(
+                    Modifier.padding(end = s.height.dp * 0.24f),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (cam) Box(Modifier.size(s.height.dp * 0.22f).clip(CircleShape).background(Tints.Green))
+                    if (mic) Box(Modifier.size(s.height.dp * 0.22f).clip(CircleShape).background(Tints.Orange))
+                }
             }
         }
 
@@ -354,8 +376,66 @@ private fun NoticeCompact(n: Notice, s: IslandSettings, wideWidth: Dp) {
         n.style == NoticeStyle.EGG -> EggBanner(n, s)
         n.style == NoticeStyle.SENT -> SentBanner(n, s, wideWidth)
         n.style == NoticeStyle.UPDATE -> UpdateCard(n, s, wideWidth)
+        n.style == NoticeStyle.FACEID -> FaceIdNotice(n, s)
         n.style == NoticeStyle.PILL || n.title.isBlank() && n.state == null -> PillNotice(n, s)
         else -> WideNotice(n, s, wideWidth)
+    }
+}
+
+/**
+ * «Face Unlock» (бета): анимация разблокировки в стиле Face ID.
+ * Стиль 1 — раскрытый вид с большим «лицом» и галочкой, стиль 2 — малый вырез-капсула.
+ */
+@Composable
+private fun FaceIdNotice(n: Notice, s: IslandSettings) {
+    if (s.faceStyle == FaceStyle.EXPANDED) {
+        val height = noticeHeight(s)
+        val haptic = rememberHaptic()
+        val pop = remember(n.id) { Animatable(0.6f) }
+        val ring = remember(n.id) { Animatable(0f) }
+        LaunchedEffect(n.id) {
+            haptic()
+            launch { pop.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = 300f)) }
+            ring.animateTo(1f, tween(650, easing = FastOutSlowInEasing))
+        }
+        Row(
+            Modifier.width(messageWidth()).height(height).padding(horizontal = height * 0.32f),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Rounded.Face, null, tint = Tints.Green, modifier = Modifier.size(height * 0.5f).scale(pop.value))
+            Spacer(Modifier.width(12.dp))
+            Text(
+                n.state ?: tr("Разблокировано", "Unlocked"),
+                color = Color(s.textColor),
+                fontSize = (17f * (s.textScaleTitle / 100f)).coerceAtLeast(11f).sp,
+                fontWeight = FontWeight.SemiBold,
+                fontFamily = s.fontFamily.family(),
+            )
+            Spacer(Modifier.weight(1f))
+            CheckBadge(Tints.Green, animate = true, modifier = Modifier.size(height * 0.42f))
+        }
+    } else {
+        val h = activeHeight(s)
+        val pop = remember(n.id) { Animatable(0.5f) }
+        LaunchedEffect(n.id) { pop.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = 300f)) }
+        CompactRow(h, compactGap(s), h * 2.2f,
+            left = {
+                Icon(Icons.Rounded.Face, null, tint = Tints.Green, modifier = Modifier.size(h * 0.52f).scale(pop.value))
+            },
+            right = {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                    Text(
+                        n.state ?: tr("Разблокировано", "Unlocked"),
+                        color = Color(s.textColor),
+                        fontSize = (16f * (s.textScaleTitle / 100f)).coerceAtLeast(10f).sp,
+                        fontWeight = FontWeight.SemiBold,
+                        fontFamily = s.fontFamily.family(),
+                    )
+                    Icon(Icons.Rounded.Check, null, tint = Tints.Green, modifier = Modifier.size(h * 0.34f))
+                }
+            },
+            shrink = false,
+        )
     }
 }
 
@@ -375,6 +455,10 @@ private fun WideNotice(n: Notice, s: IslandSettings, wideWidth: Dp) {
         n.ring != null -> "${(n.ring * 100).toInt()}%"
         else -> n.state ?: n.caption
     }
+    val fg = Color(s.textColor)
+    val tf = s.fontFamily.family()
+    val tScale = (s.textScaleTitle / 100f).coerceIn(0.7f, 1.5f)
+    val vScale = (s.textScaleSub / 100f).coerceIn(0.7f, 1.5f)
     Row(
         Modifier.width(wideWidth).height(height).padding(horizontal = height * 0.32f),
         verticalAlignment = Alignment.CenterVertically,
@@ -383,14 +467,14 @@ private fun WideNotice(n: Notice, s: IslandSettings, wideWidth: Dp) {
             Icon(n.icon, null, tint = n.tint, modifier = Modifier.size(height * 0.355f).scale(pop.value))
             Spacer(Modifier.width(9.dp))
             // «Не беспокоить», «Режим полёта» не влезают до камеры — шрифт чуть меньше, а не многоточие
-            FitText(n.title, Color.White, 17.sp, 13.sp, FontWeight.SemiBold, Modifier.weight(1f, fill = false))
+            FitText(n.title, fg, 17.sp * tScale, 13.sp * tScale, FontWeight.SemiBold, Modifier.weight(1f, fill = false), style = Digits.copy(fontFamily = tf))
         }
         Spacer(Modifier.width(compactGap(s)))
         Row(Modifier.weight(1f), horizontalArrangement = Arrangement.End,
             verticalAlignment = Alignment.CenterVertically) {
             if (value != null) {
-                FitText(value, n.tint, if (value.length <= 5) 17.sp else 16.sp, 12.sp, FontWeight.SemiBold,
-                    Modifier.weight(1f, fill = false), style = Digits)
+                FitText(value, n.tint, if (value.length <= 5) 17.sp * vScale else 16.sp * vScale, 12.sp * vScale, FontWeight.SemiBold,
+                    Modifier.weight(1f, fill = false), style = Digits.copy(fontFamily = tf))
             }
             if (n.battery != null) {
                 Spacer(Modifier.width(8.dp))
@@ -431,7 +515,12 @@ private fun PillNotice(n: Notice, s: IslandSettings) {
         },
         right = {
             if (n.state != null) {
-                Text(n.state, color = n.tint, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, softWrap = false)
+                Text(
+                    n.state, color = n.tint,
+                    fontSize = (16f * (s.textScaleTitle / 100f)).coerceIn(11f, 22f).sp,
+                    fontWeight = FontWeight.SemiBold, maxLines = 1, softWrap = false,
+                    fontFamily = s.fontFamily.family(),
+                )
             }
         },
         // Как в ролике: подпись в полный размер, пилюля для неё чуть шире
@@ -582,7 +671,10 @@ private fun MessageCard(n: Notice, m: AppMessage, s: IslandSettings, @Suppress("
 
 /** Ширина плашки уведомления — как у всплывающего уведомления Android: по 16 dp от краёв экрана. */
 @Composable
-fun messageWidth(): Dp = (LocalConfiguration.current.screenWidthDp.dp - 32.dp).coerceAtMost(460.dp)
+fun messageWidth(): Dp {
+    val pct = SettingsRepo.current.maxWidthPct.coerceIn(60, 100) / 100f
+    return ((LocalConfiguration.current.screenWidthDp.dp - 32.dp) * pct).coerceAtMost(460.dp)
+}
 
 /**
  * Откуда в плашке начинается само уведомление: под строкой состояния, на той же высоте, что у системного

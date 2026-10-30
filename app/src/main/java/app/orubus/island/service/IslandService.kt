@@ -194,6 +194,8 @@ class IslandService : AccessibilityService() {
         clockReader = ClockScreenReader(this, scope).also { ClockControl.reader = it }
         payReader = PayScreenReader(this, scope)
         alarmMonitor = AlarmMonitor(this).also { it.start() }
+        // Приватность: точки микрофона и камеры, хотспот
+        PrivacyMonitor.start(this, scope)
         IslandBus.serviceRunning.value = true
 
         // Движок: пульс острова для [IslandEngine] и разрешение на самолечение
@@ -275,8 +277,24 @@ class IslandService : AccessibilityService() {
         }
 
         scope.launch {
-            combine(SettingsRepo.state, IslandBus.landscape, IslandBus.offSchedule) { s, land, _ -> s to land }
-                .collect { (s, land) -> applySettings(s, land) }
+            val gate: kotlinx.coroutines.flow.Flow<Pair<Boolean, Boolean>> = combine(
+                IslandBus.locked,
+                IslandBus.keyguard,
+                IslandBus.gameForeground,
+                IslandBus.foregroundPackage,
+            ) { locked, keyguard, _, foreground -> (locked || keyguard) to (foreground == packageName) }
+            combine(
+                SettingsRepo.state,
+                IslandBus.landscape,
+                IslandBus.offSchedule,
+                gate,
+            ) { s, land, _, gatePair ->
+                VisibilityInput(s, land, gatePair.first, gatePair.second)
+            }
+                .distinctUntilChanged()
+                .collect { input ->
+                    applySettings(input.s, input.landscape, input.locked, input.selfForeground)
+                }
         }
 
         // «По расписанию»: проверяем ровно на границах часов и со включением экрана (пока телефон спит, ожидание стоит)
@@ -407,8 +425,24 @@ class IslandService : AccessibilityService() {
         }
     }
 
-    private fun applySettings(s: IslandSettings, landscape: Boolean) {
-        visible = s.enabled && !(s.hideInLandscape && landscape) && !IslandBus.offSchedule.value
+    /** Всё, от чего зависит видимость окна острова. */
+    private data class VisibilityInput(
+        val s: IslandSettings,
+        val landscape: Boolean,
+        val locked: Boolean,
+        val selfForeground: Boolean,
+    )
+
+    private fun applySettings(s: IslandSettings, landscape: Boolean, lockedHide: Boolean, selfForeground: Boolean) {
+        val landscapeAllowed = if (s.showInLandscape) {
+            // «Гибкий» — полный остров, «Фиксированный» — виден, но содержимое решает капсула
+            true
+        } else {
+            !landscape
+        }
+        val gameHide = IslandBus.gameForeground.value && !s.gameShowIsland
+        val hide = lockedHide || (s.hideWhileForeground && selfForeground) || gameHide
+        visible = s.enabled && landscapeAllowed && !hide && !IslandBus.offSchedule.value
         display?.visibility = if (visible) View.VISIBLE else View.GONE
         // Остров спрятан — выключен, вне расписания или в повороте (скажем, смотрят видео): Compose в его окне
         // не рисует и не просыпается ради анимаций и эквалайзера, пока остров снова не покажется. С погашенным
@@ -646,6 +680,13 @@ class IslandService : AccessibilityService() {
         payReader?.onForeground(pkg, cls)
         setScreenEvents(clockReader?.active == true || payReader?.active == true)
         IslandBus.foregroundPackage.value = pkg
+        // Игровой режим: игра на переднем плане? Флаг приложения — самый надёжный сигнал
+        val isGame = runCatching {
+            val info = packageManager.getApplicationInfo(pkg, 0)
+            (info.flags and android.content.pm.ApplicationInfo.FLAG_IS_GAME) != 0 ||
+                (info.category == android.content.pm.ApplicationInfo.CATEGORY_GAME)
+        }.getOrDefault(false)
+        if (IslandBus.gameForeground.value != isGame) IslandBus.gameForeground.value = isGame
     }
 
     /**
@@ -690,6 +731,7 @@ class IslandService : AccessibilityService() {
         torch?.stop()
         alarm?.stop()
         calls?.stop()
+        PrivacyMonitor.stop()
         navReader?.stop()
         clockReader?.stop()
         payReader?.stop()

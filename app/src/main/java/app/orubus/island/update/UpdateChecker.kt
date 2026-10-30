@@ -61,7 +61,8 @@ sealed interface DownloadState {
  * поэтому APK ставится поверх.
  */
 object UpdateChecker {
-    const val REPO = "Akira9021/Dynamic-Island-"
+    /** Репозиторий проекта Orubus: отсюда приходят обновления и ссылки на GitHub */
+    const val REPO = "orubus-dev/dynamic-island"
     private const val CHECK_EVERY_MS = 3 * 60 * 60 * 1000L
 
     val state = MutableStateFlow<UpdateState>(UpdateState.Idle)
@@ -154,7 +155,17 @@ object UpdateChecker {
     }
 
     /** Имя скачанного APK: по версии, без лишних символов из тега. */
-    private fun apkName(version: String) = "DynamicIsland-${version.filter { it.isLetterOrDigit() || it == '.' }}.apk"
+    private fun apkName(version: String) = "OrubusIsland-${version.filter { it.isLetterOrDigit() || it == '.' }}.apk"
+
+    /** Открыть страницу проекта на GitHub (используется из настроек и политики конфиденциальности). */
+    fun openGithub(context: Context) {
+        runCatching {
+            context.startActivity(
+                android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/$REPO"))
+                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+        }
+    }
 
     /**
      * Скачанный APK именно этой версии, если он ещё лежит в кэше: тогда «Установить» ставит его без новой

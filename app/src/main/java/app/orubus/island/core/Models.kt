@@ -198,6 +198,8 @@ enum class NoticeStyle {
     SENT,
     /** Новая версия: значок приложения, что нового и кнопки «Позже» и «Обновить»; после установки — «Обновлено» */
     UPDATE,
+    /** Face Unlock: анимация разблокировки в стиле Face ID (бета) */
+    FACEID,
 }
 
 /** На экране — оплата телефоном: в каком приложении и его значок. Держится, пока не заплатили или не ушли. */
@@ -273,6 +275,8 @@ data class Notice(
     val alarm: AlarmInfo? = null,
     /** Новая версия для плашки NoticeStyle.UPDATE; null — уже обновились */
     val update: app.orubus.island.update.Release? = null,
+    /** Цвет фона плашки от «Автоцвета фона» (подобран по значку приложения); null — обычный */
+    val bg: Long? = null,
     val id: Long = ids.incrementAndGet(),
 ) {
     private companion object {

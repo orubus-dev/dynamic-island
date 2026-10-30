@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.PrivacyTip
 import androidx.compose.material.icons.rounded.CreditCard
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Lightbulb
@@ -225,11 +226,14 @@ fun AppInfoScreen(open: (Screen) -> Unit) {
         SectionHeader(tr("Проект", "Project"))
         Group {
             GroupItem(Pos.First, ImageVector.vectorResource(R.drawable.ic_github), tr("Страница GitHub", "GitHub page"),
-                tr("Описание, новые версии и исходный код", "Description, new versions and source code"),
+                "github.com/${UpdateChecker.REPO}",
                 onClick = { openGithub(context) }, color = GithubPurple) { Arrow() }
+            GroupItem(Pos.Middle, Icons.Rounded.PrivacyTip, tr("Политика конфиденциальности", "Privacy Policy"),
+                tr("Остров ничего не собирает и не отправляет", "The island collects and sends nothing"),
+                onClick = { open(Screen.PRIVACY) }, color = Tile.Gray) { Arrow() }
             GroupItem(Pos.Last, Icons.Rounded.Info, tr("Об острове", "About the island"),
                 tr("Что умеет и откуда идея", "What it does and where the idea comes from"),
-                onClick = { open(Screen.ABOUT) }, color = Tile.Indigo) { Arrow() }
+                onClick = { open(Screen.ABOUT) }, color = Tile.Gray) { Arrow() }
         }
     }
 

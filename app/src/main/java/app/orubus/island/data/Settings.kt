@@ -3,6 +3,7 @@ package app.orubus.island.data
 import android.content.Context
 import android.content.SharedPreferences
 import app.orubus.island.core.tr
+import app.orubus.island.ui.FontChoice
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -98,6 +99,26 @@ enum class AppLanguage {
         }
 }
 
+/** Поведение острова в альбомной ориентации. */
+@Serializable
+enum class LandscapeMode(private val ru: String, private val en: String) {
+    FIXED("Фиксированный вырез", "Fix Notch"),
+    FLEXIBLE("Гибкий", "Flexible Notch"),
+    ;
+
+    val title: String get() = tr(ru, en)
+}
+
+/** Стиль анимации разблокировки «Face Unlock»: раскрытая карточка или малый вырез. */
+@Serializable
+enum class FaceStyle(private val ru: String, private val en: String) {
+    EXPANDED("Стиль 1 · Раскрытый", "Style 1 · Expanded"),
+    SMALL("Стиль 2 · Малый вырез", "Style 2 · Small notch"),
+    ;
+
+    val title: String get() = tr(ru, en)
+}
+
 @Serializable
 data class IslandSettings(
     val enabled: Boolean = true,
@@ -153,6 +174,19 @@ data class IslandSettings(
     val evPaySuccess: Boolean = true,
     /** Поставили будильник — плашка со временем подъёма */
     val evAlarmSet: Boolean = true,
+    /** Точка доступа (хотспот) включилась или выключилась */
+    val evHotspot: Boolean = true,
+    /** Приложение начало использовать микрофон */
+    val evMic: Boolean = true,
+    /** Приложение начало использовать камеру */
+    val evCamera: Boolean = true,
+    /** Точки доступа к микрофону и камере у выреза, пока те заняты */
+    val privacyDots: Boolean = true,
+    /** Точки видны и на экране блокировки */
+    val dotsOnLockscreen: Boolean = true,
+    /** Анимация разблокировки в стиле Face ID (бета) */
+    val evFaceUnlock: Boolean = false,
+    val faceStyle: FaceStyle = FaceStyle.SMALL,
 
     // Размер и положение, dp. Камера Android меньше, чем у iPhone (там капсула 126×37), поэтому и остров
     // по умолчанию меньше; ширина и высота настраиваются в «Положении и размере»
@@ -171,20 +205,43 @@ data class IslandSettings(
     val activeExtra: Int = 6,
     /** На сколько свёрнутая капсула с активностью (навигатор, фонарик, музыка) шире спокойной; 0 — такая же */
     val activeWidth: Int = 40,
+    /** Радиус углов спокойной/активной капсулы, dp («радиус малого острова») */
+    val radiusSmall: Int = 16,
+    /** Радиус углов раскрытого острова и плашек, dp («радиус большого острова») */
+    val radiusBig: Int = 44,
+    /** До какой доли ширины экрана (%) растёт раскрытый остров и плашки — «максимальная ширина» */
+    val maxWidthPct: Int = 100,
     // Нет в старых настройках → 1, тогда размеры переносятся на новые
     val layoutVersion: Int = 1,
 
     // Цвета
     val color: Long = 0xFF000000,
+    /** Цвет текста плашек-уведомлений (заголовок и подпись) */
+    val textColor: Long = 0xFFFFFFFF,
     val outline: Boolean = false,
     val outlineColor: Long = 0xFF3A3A40,
     val outlineWidth: Float = 1f,
     val outlineFromArt: Boolean = true,
     val shadow: Boolean = false,
+    /** Рамка («обводка») спокойной капсулы */
+    val borderSmall: Boolean = false,
+    /** Рамка раскрытого острова и плашек */
+    val borderExpanded: Boolean = false,
 
     // Цвет кнопок в карточке уведомления
     val accentMode: AccentMode = AccentMode.DEFAULT,
     val accentColor: Long = 0xFF0A84FF,
+    /** «Автоцвет фона»: фон плашки подстраивается под значок приложения уведомления */
+    val autoBg: Boolean = false,
+
+    // Текст и шрифт острова
+    val fontFamily: FontChoice = FontChoice.INTER,
+    /** Масштаб текста заголовков, % */
+    val textScaleTitle: Int = 100,
+    /** Масштаб текста подписей, % */
+    val textScaleSub: Int = 100,
+    /** Масштаб текста кнопок, % */
+    val textScaleButtons: Int = 100,
 
     // Обновления из GitHub Releases
     val autoUpdateCheck: Boolean = true,
@@ -237,6 +294,8 @@ data class IslandSettings(
     val longPressAction: TapAction = TapAction.OPEN_APP,
     val swipeTracks: Boolean = true,
     val swipeExpand: Boolean = true,
+    /** Смахнул уведомление с острова — убрать его и в шторке */
+    val swipeClearNotif: Boolean = false,
 
     // Текст песен
     val lyricsEnabled: Boolean = true,
@@ -244,6 +303,10 @@ data class IslandSettings(
     // Поведение
     val hideIdle: Boolean = false,
     val hideInLandscape: Boolean = true,
+    /** Показывать остров в альбомной ориентации (глобальный выключатель альбомного режима) */
+    val showInLandscape: Boolean = false,
+    /** В альбомном: «Фиксированный вырез» — остров у камеры, «Гибкий» — полный функционал */
+    val landscapeMode: LandscapeMode = LandscapeMode.FLEXIBLE,
     val hideWhenPlayerOpen: Boolean = true,
     /** «По расписанию»: остров виден только с [scheduleFrom] до [scheduleTo] часов (можно через полночь) */
     val scheduleOn: Boolean = false,
@@ -255,6 +318,10 @@ data class IslandSettings(
     val autoCollapseSec: Int = 0,
     /** Вторая активность — кружком рядом с капсулой, как на iPhone */
     val bubble: Boolean = true,
+    /** «Двойной остров»: вторая активность — второй вырез вместо кружка */
+    val dualNotch: Boolean = false,
+    /** «Авто-расширение»: активный остров чуть толще, пока показывает музыку/таймер */
+    val autoExpandActive: Boolean = false,
     /** Нажатие на пустой остров раскрывает его: часы, заряд и [quickActions] */
     val idleExpand: Boolean = true,
     /** Кнопки раскрытого пустого острова; пусто — только часы и заряд */
@@ -263,6 +330,17 @@ data class IslandSettings(
     val keepAlive: Boolean = false,
     /** Движок острова: если службы упали — включить их заново (с WRITE_SECURE_SETTINGS работает сам) */
     val autoHeal: Boolean = true,
+    /** Скрывать остров на экране блокировки */
+    val hideOnLockscreen: Boolean = false,
+    /** Прятать остров, если он без дела: включатель и задержка в секундах */
+    val autoHideIdle: Boolean = false,
+    val hideIdleSec: Int = 1,
+    /** Не показывать уведомления и музыку, пока открыт сам остров (это приложение) */
+    val hideWhileForeground: Boolean = true,
+    /** Игровой режим: не показывать остров во время игры */
+    val gameShowIsland: Boolean = false,
+    /** Игровой режим: пропускать ли уведомления во время игры */
+    val gameShowNotices: Boolean = false,
     /** Сколько строк текста видно в карточке уведомления */
     val msgLines: Int = 3,
     /** Уведомления приложения, которое сейчас открыто, тоже приходят в остров */
@@ -340,6 +418,15 @@ object SettingsRepo {
                     // Сильная упругость была по умолчанию — переходим на новую, мягче
                     elasticity = if (elasticity == Elasticity.HIGH) d.elasticity else elasticity,
                     layoutVersion = 4,
+                )
+            }
+        }
+        // 1.8: «Показывать в альбомной» теперь главный выключатель (раньше был обратный «Скрывать в альбомной»)
+        if (current.layoutVersion < 5) {
+            update {
+                copy(
+                    showInLandscape = !hideInLandscape,
+                    layoutVersion = 5,
                 )
             }
         }

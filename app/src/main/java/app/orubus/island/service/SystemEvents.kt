@@ -1,6 +1,9 @@
 package app.orubus.island.service
 
 import android.app.KeyguardManager
+
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Face
 import android.app.NotificationManager
 import android.bluetooth.BluetoothClass
 import android.bluetooth.BluetoothDevice
@@ -301,7 +304,21 @@ class SystemEvents(private val context: Context) {
         val now = SystemClock.elapsedRealtime()
         if (now - lastUnlock < 3_000) return
         lastUnlock = now
-        notice(s.evUnlock, Notice("", null, ic(R.drawable.ios_lock_open), Color.White, style = NoticeStyle.PILL))
+        // «Face Unlock» (бета): анимация разблокировки вместо пилюли с замком
+        if (s.evFaceUnlock) {
+            notice(
+                true,
+                Notice(
+                    "",
+                    tr("Разблокировано", "Unlocked"),
+                    Icons.Rounded.Face,
+                    Tints.Green,
+                    style = NoticeStyle.FACEID,
+                ),
+            )
+        } else {
+            notice(s.evUnlock, Notice("", null, ic(R.drawable.ios_lock_open), Color.White, style = NoticeStyle.PILL))
+        }
     }
 
     /** Заблокирован ли телефон так, что для входа нужен PIN-код, ключ или пароль. */

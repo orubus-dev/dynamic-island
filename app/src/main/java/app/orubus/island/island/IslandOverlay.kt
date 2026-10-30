@@ -106,6 +106,7 @@ import app.orubus.island.data.SettingsRepo
 import app.orubus.island.data.TapAction
 import app.orubus.island.service.CallMonitor
 import app.orubus.island.service.NavScreen
+import app.orubus.island.service.NotifListener
 import app.orubus.island.service.PayMonitor
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -152,6 +153,7 @@ fun IslandOverlay(
     val foreground by IslandBus.foregroundPackage.collectAsState()
     val expanded by IslandBus.expanded.collectAsState()
     val focus by IslandBus.focus.collectAsState()
+    val game by IslandBus.gameForeground.collectAsState()
     val calibrating by IslandBus.calibrating.collectAsState()
     val nextAlarm by IslandBus.nextAlarm.collectAsState()
     val egg by IslandBus.egg.collectAsState()
@@ -220,25 +222,29 @@ fun IslandOverlay(
     // Смахнутый входящий не показываем, пока звонит (сбрасывает служба, когда звонить перестали)
     val callHidden by IslandBus.callHidden.collectAsState()
     val acts = buildList {
-        // Входящий звонок важнее всего, как на iPhone
+        val gameSilent = game && !s.gameShowIsland
+        // Входящий звонок важнее всего, как на iPhone — и в играх тоже
         if (call != null && call.incoming && !callHidden) add(Act.CallA(call))
-        notice?.let { add(Act.NoticeA(it)) }
+        if (!(game && !s.gameShowNotices)) notice?.let { add(Act.NoticeA(it)) }
 
         val persistent = mutableListOf<Act>()
         val t = timer
+        // Звонящий таймер не прячем даже в игровом режиме — человек ждёт сигнал
         if (t != null && t.ringing) persistent += Act.TimerA(t)
-        // Оплата телефоном — пока ждём терминал, она главнее остального
-        payReady?.let { persistent += Act.PayA(it) }
-        if (call != null && !call.incoming) persistent += Act.CallA(call)
-        if (torch.on && s.cardTorch) persistent += Act.TorchA(torch)
-        if (t != null && !t.ringing) persistent += Act.TimerA(t)
-        if (s.cardLive) liveActive.maxByOrNull { it.postTime }?.let { persistent += Act.LiveA(it) }
-        stopwatch?.let { persistent += Act.StopwatchA(it) }
-        if (s.cardTimer) chronoActive.maxByOrNull { it.postTime }?.let { persistent += Act.ChronoA(it) }
-        val m = media
-        if (s.cardMedia && m != null && !(s.hideWhenPlayerOpen && foreground == m.pkg)) persistent += Act.MediaA(m)
-        if (s.cardProgress) progress.values.maxByOrNull { it.postTime }?.let { persistent += Act.ProgressA(it) }
-        if (s.cardCharging && battery.charging) persistent += Act.ChargingA(battery)
+        if (!gameSilent) {
+            // Оплата телефоном — пока ждём терминал, она главнее остального
+            payReady?.let { persistent += Act.PayA(it) }
+            if (call != null && !call.incoming) persistent += Act.CallA(call)
+            if (torch.on && s.cardTorch) persistent += Act.TorchA(torch)
+            if (t != null && !t.ringing) persistent += Act.TimerA(t)
+            if (s.cardLive) liveActive.maxByOrNull { it.postTime }?.let { persistent += Act.LiveA(it) }
+            stopwatch?.let { persistent += Act.StopwatchA(it) }
+            if (s.cardTimer) chronoActive.maxByOrNull { it.postTime }?.let { persistent += Act.ChronoA(it) }
+            val m = media
+            if (s.cardMedia && m != null && !(s.hideWhenPlayerOpen && foreground == m.pkg)) persistent += Act.MediaA(m)
+            if (s.cardProgress) progress.values.maxByOrNull { it.postTime }?.let { persistent += Act.ProgressA(it) }
+            if (s.cardCharging && battery.charging) persistent += Act.ChargingA(battery)
+        }
         // Будильник — тише всех: показывается, только когда больше ничего нет, и не уходит в пузырь
         val alarm = nextAlarm
         if (s.cardAlarm && alarm != null && alarm.triggerAt - alarmNow in 1..ALARM_LEAD_MS) persistent += Act.AlarmA(alarm)
@@ -269,8 +275,8 @@ fun IslandOverlay(
         else -> acts.firstOrNull() ?: Act.Idle
     }
     val incoming = (primary as? Act.CallA)?.c?.incoming == true
-    // Вторая активность — кружком рядом, если его не выключили в «Поведении»
-    val secondary = if (!s.bubble || primary.transient || incoming || calibrating) null
+    // Вторая активность — кружком рядом, а с «Двойным островом» — второй плашкой
+    val secondary = if ((!s.bubble && !s.dualNotch) || primary.transient || incoming || calibrating) null
     else acts.drop(1).firstOrNull { !it.transient && it !is Act.AlarmA }
     val showExpanded = expanded && !primary.transient && !incoming && !calibrating
     val h = s.height.dp
@@ -279,8 +285,24 @@ fun IslandOverlay(
     val lastSecondary = remember { arrayOfNulls<Act>(1) }
     if (secondary != null) lastSecondary[0] = secondary
     val bubbleVisible = secondary != null && !showExpanded
-    // Место под пузырь читается при измерении: кадр анимации не пересобирает остров
-    val slot = animateDpAsState(if (bubbleVisible) activeHeight(s) + 6.dp else 0.dp, islandSpec(s), label = "slot")
+    // «Авто-расширение»: активный остров чуть толще, пока показывает музыку, таймер или зарядку
+    val sEff = if (s.autoExpandActive && !showExpanded && primary !is Act.Idle &&
+        primary !is Act.NoticeA && !calibrating && !previewing
+    ) {
+        s.copy(activeExtra = (s.activeExtra + 3).coerceAtMost(14))
+    } else {
+        s
+    }
+    // Место под пузырь/второй вырез читается при измерении: кадр анимации не пересобирает остров
+    val slot = animateDpAsState(
+        when {
+            !bubbleVisible -> 0.dp
+            s.dualNotch -> activeHeight(s) * 2.3f
+            else -> activeHeight(s) + 6.dp
+        },
+        islandSpec(s),
+        label = "slot",
+    )
 
     // Раскрытая активность пропала (музыку закрыли, таймер отменили) — сворачиваемся, а не показываем часы
     val focusGone = expanded && focus != null && focus != Act.Idle.id && acts.none { it.id == focus }
@@ -299,7 +321,16 @@ fun IslandOverlay(
         Controls.collapse()
     }
 
-    val hidden = s.hideIdle && primary is Act.Idle && !showExpanded && !calibrating
+    // «Прятать без дела»: через hideIdleSec секунд пустого острова он прячется и возвращается с новым событием
+    var idleHidden by remember { mutableStateOf(false) }
+    LaunchedEffect(primary.id, s.autoHideIdle, s.hideIdleSec, screenOn) {
+        idleHidden = false
+        if (!s.autoHideIdle || primary !is Act.Idle || showExpanded || calibrating) return@LaunchedEffect
+        delay(s.hideIdleSec * 1000L)
+        if (primary is Act.Idle && !IslandBus.expanded.value) idleHidden = true
+    }
+
+    val hidden = (s.hideIdle || idleHidden) && primary is Act.Idle && !showExpanded && !calibrating
 
     // Перед сменой формы просим окно стать большим, чтобы анимация шла внутри неподвижного окна
     val transitionKey = "${primary.id}|$showExpanded|${secondary?.id}|$hidden"
@@ -344,7 +375,7 @@ fun IslandOverlay(
             enter = if (s.reduceEffects) fadeIn() else scaleIn(islandSpec(s), initialScale = 0.3f, transformOrigin = top) + fadeIn(tween(120)),
             exit = if (s.reduceEffects) fadeOut() else scaleOut(islandSpec(s), targetScale = 0.3f, transformOrigin = top) + fadeOut(tween(160)),
         ) {
-            IslandRow(slot, s, primary, showExpanded, lyrics, battery, bubbleVisible, lastSecondary[0], calibrating, onBody, onBubble)
+            IslandRow(slot, sEff, primary, showExpanded, lyrics, battery, bubbleVisible, lastSecondary[0], calibrating, onBody, onBubble)
         }
         if (eggOn) {
             EggSparks { body.value }
@@ -438,30 +469,43 @@ private fun IslandBody(
     val haptic = rememberHaptic()
     val scope = rememberCoroutineScope()
     val conf = LocalConfiguration.current
-    // Раскрытый остров iPhone — 371 pt при ширине экрана 393 pt, то есть по 11 с каждой стороны
-    val expandedWidth = (conf.screenWidthDp.dp - 22.dp).coerceAtMost(460.dp)
+    // Раскрытый остров iPhone — 371 pt при ширине экрана 393 pt, то есть по 11 с каждой стороны.
+    // «Максимальная ширина» из настроек ограничивает, насколько широко он раскрывается
+    val expandedWidth = ((conf.screenWidthDp.dp - 22.dp) * (s.maxWidthPct / 100f)).coerceAtMost(460.dp)
     val h = s.height.dp
 
+    // Скругления из настроек: «малый радиус» — для капсулы, «большой» — для раскрытого и плашек.
+    // Радиус капсулы не больше половины высоты, иначе углы обрежутся некрасиво
+    val smallR = s.radiusSmall.dp
+    val bigR = s.radiusBig.dp
     // Скругления — как в ролике: плеер и фонарик 46, навигатор 42, обновление 36, уведомление 32
     val cornerTarget = when {
-        expanded && (primary is Act.MediaA || primary is Act.TorchA) -> 46.dp
-        expanded && primary is Act.LiveA -> 42.dp
-        expanded -> 44.dp
-        primary is Act.NoticeA && (primary.n.style == NoticeStyle.MESSAGE || primary.n.style == NoticeStyle.EGG) -> 32.dp
-        primary is Act.NoticeA && primary.n.style == NoticeStyle.UPDATE -> 36.dp
-        primary is Act.NoticeA && primary.n.style == NoticeStyle.WIDE && primary.n.title.isNotBlank() -> noticeHeight(s) / 2
+        expanded && (primary is Act.MediaA || primary is Act.TorchA) -> bigR
+        expanded && primary is Act.LiveA -> bigR
+        expanded -> bigR
+        primary is Act.NoticeA && (primary.n.style == NoticeStyle.MESSAGE || primary.n.style == NoticeStyle.EGG) -> bigR.coerceAtMost(34.dp)
+        primary is Act.NoticeA && primary.n.style == NoticeStyle.UPDATE -> bigR.coerceAtMost(38.dp)
+        primary is Act.NoticeA && primary.n.style == NoticeStyle.WIDE && primary.n.title.isNotBlank() ->
+            minOf(bigR, noticeHeight(s) / 2)
         primary is Act.NoticeA && (primary.n.style == NoticeStyle.PAY_DONE ||
-            primary.n.style == NoticeStyle.LIVE || primary.n.style == NoticeStyle.ALARM || primary.n.style == NoticeStyle.SENT) -> noticeHeight(s) / 2
-        primary is Act.PayA -> noticeHeight(s) / 2
-        primary is Act.CallA && primary.c.incoming -> callHeight(s) / 2
-        primary is Act.Idle -> h / 2
-        else -> activeHeight(s) / 2
+            primary.n.style == NoticeStyle.LIVE || primary.n.style == NoticeStyle.ALARM || primary.n.style == NoticeStyle.SENT ||
+            primary.n.style == NoticeStyle.FACEID) -> minOf(bigR, noticeHeight(s) / 2)
+        primary is Act.PayA -> minOf(bigR, noticeHeight(s) / 2)
+        primary is Act.CallA && primary.c.incoming -> minOf(bigR, callHeight(s) / 2)
+        primary is Act.Idle -> smallR.coerceAtMost(h / 2)
+        else -> smallR.coerceAtMost(activeHeight(s) / 2)
     }
     // Скругление читается при рисовании: кадр раскрытия перерисовывает рамку и стекло, а не пересобирает остров
     val corner = animateDpAsState(cornerTarget, islandSpec(s), label = "corner")
     val shape = remember(corner, s.notch) { AnimatedIslandShape(corner, s.notch) }
     val accent = (primary as? Act.MediaA)?.m?.accent
     val outlineColor = if (s.outlineFromArt && accent != null) accent else Color(s.outlineColor)
+    // «Автоцвет фона»: плашка окрашивается цветом, подобранным по значку приложения
+    val bgBase = (primary as? Act.NoticeA)?.n?.bg
+        ?.takeIf { s.autoBg }
+        ?.let { Color(it) } ?: Color(s.color)
+    // Рамка по состоянию: «малая» — у капсулы, «большая» — у раскрытого острова и плашек
+    val borderOn = if (expanded || primary is Act.NoticeA) s.outline && s.borderExpanded else s.outline && s.borderSmall
 
     // Свечение цвета обложки, пока играет музыка («Эффекты»): с треком цвет плавно меняется, с паузой гаснет
     val playingArt = (primary as? Act.MediaA)?.m?.takeIf { it.playing }?.accent
@@ -547,15 +591,15 @@ private fun IslandBody(
             }
             .then(
                 if (s.liquidGlass && !calibrating) {
-                    Modifier.glassSurface(shape, Color(s.color), s.glassOpacity / 100f, tilt = { tilt.value }) { sheen.value }
+                    Modifier.glassSurface(shape, bgBase, s.glassOpacity / 100f, tilt = { tilt.value }) { sheen.value }
                 } else {
-                    Modifier.background(if (calibrating) CalibrationRed else Color(s.color))
+                    Modifier.background(if (calibrating) CalibrationRed else bgBase)
                 },
             )
             .then(
                 when {
                     calibrating -> Modifier.border(2.dp, Color.White, shape)
-                    s.outline -> Modifier.border(s.outlineWidth.dp, outlineColor, shape)
+                    borderOn -> Modifier.border(s.outlineWidth.dp, outlineColor, shape)
                     else -> Modifier
                 },
             )
@@ -627,8 +671,10 @@ private fun IslandBody(
                                 Controls.collapse()
                             }
                             // Смахнуть уведомление вверх, как баннер на iPhone. Порог полный, чтобы палец,
-                            // чуть съехавший при нажатии «Ответить», не убирал плашку
+                            // чуть съехавший при нажатии «Ответить», не убирал плашку.
+                            // Со «Смахнул — значит убрать» уведомление уходит и из шторки
                             !isExpanded && vertical && dy < -threshold && act is Act.NoticeA -> {
+                                if (settings.swipeClearNotif) act.n.message?.key?.let { NotifListener.cancelKey(it) }
                                 IslandBus.notice.value = null
                             }
                             // Подсказку оплаты тоже можно смахнуть
@@ -823,16 +869,19 @@ private fun Bubble(act: Act, s: IslandSettings) {
     val haptic = rememberHaptic()
     val tilt = IslandBus.glassTilt.collectAsState()
     val now = rememberNow(500, active = act is Act.TimerA)
+    // «Двойной остров»: второй вырез — капсула, а не кружок
+    val shape = if (s.dualNotch) RoundedCornerShape(h / 2) else CircleShape
+    val dualWidth = if (s.dualNotch) h * 2.1f else h
     Box(
         Modifier
-            .size(h)
-            .then(if (s.shadow && !s.reduceEffects) Modifier.shadow(8.dp, CircleShape) else Modifier)
-            .clip(CircleShape)
+            .size(width = dualWidth, height = h)
+            .then(if (s.shadow && !s.reduceEffects) Modifier.shadow(8.dp, shape) else Modifier)
+            .clip(shape)
             .then(
-                if (s.liquidGlass) Modifier.glassSurface(CircleShape, Color(s.color), s.glassOpacity / 100f, tilt = { tilt.value })
+                if (s.liquidGlass) Modifier.glassSurface(shape, Color(s.color), s.glassOpacity / 100f, tilt = { tilt.value })
                 else Modifier.background(Color(s.color)),
             )
-            .then(if (s.outline) Modifier.border(s.outlineWidth.dp, Color(s.outlineColor), CircleShape) else Modifier)
+            .then(if (s.outline && s.borderSmall) Modifier.border(s.outlineWidth.dp, Color(s.outlineColor), shape) else Modifier)
             .clickable {
                 haptic()
                 Controls.expand(act.id)

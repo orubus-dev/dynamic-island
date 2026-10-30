@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
 import androidx.palette.graphics.Palette
@@ -113,20 +114,23 @@ object Messages {
             n.getLargeIcon()?.loadDrawable(service)?.toBitmap(128, 128)?.asImageBitmap()
         }.getOrNull()
         val actions = if (s.msgActions) buttons(n) else emptyList()
+        val appIcon = NotificationParser.icon(service, sbn.packageName)
         val message = AppMessage(
             key = sbn.key,
             pkg = sbn.packageName,
             appName = appName,
             text = text,
             avatar = avatar,
-            appIcon = NotificationParser.icon(service, sbn.packageName),
+            appIcon = appIcon,
             intent = n.contentIntent,
             actions = actions,
             // Разбор палитры нужен только для цвета кнопок «Из аватара»
-            accent = if (s.accentMode == AccentMode.ADAPTIVE) accentOf(avatar ?: NotificationParser.icon(service, sbn.packageName)) else null,
+            accent = if (s.accentMode == AccentMode.ADAPTIVE) accentOf(avatar ?: appIcon) else null,
             history = history(ex),
             sensitive = sensitive,
         )
+        // «Автоцвет фона»: основной цвет значка приложения — цвет фона плашки
+        val bg = if (s.autoBg) accentOf(appIcon)?.toArgb()?.toLong() else null
         IslandBus.post(
             Notice(
                 title = title.ifEmpty { appName },
@@ -136,6 +140,7 @@ object Messages {
                 message = message,
                 // Текст читать дольше, чем короткое событие, а с кнопками — ещё дольше: нужно успеть нажать
                 extraMs = if (actions.isEmpty()) 2_000 else 4_500,
+                bg = bg,
             ),
         )
         // Для «Системных плашек»: какой мессенджер и всплывает ли у него ещё своя плашка поверх острова

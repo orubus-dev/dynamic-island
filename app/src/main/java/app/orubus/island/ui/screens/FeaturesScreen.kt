@@ -171,9 +171,9 @@ fun BehaviorScreen(onBack: () -> Unit) {
             GroupToggle(Pos.First, Icons.Rounded.VisibilityOff, tr("Скрывать пустую капсулу", "Hide the empty capsule"),
                 tr("Показывать капсулу, только когда в ней что-то есть", "Show the capsule only when it has something in it"),
                 s.hideIdle, color = Tile.Gray) { v -> SettingsRepo.update { copy(hideIdle = v) } }
-            GroupToggle(Pos.Middle, Icons.Rounded.ScreenRotation, tr("Скрывать в альбомной ориентации", "Hide in landscape"),
-                tr("Не мешает играм и видео", "Stays out of games and videos"),
-                s.hideInLandscape, color = Tile.Gray) { v -> SettingsRepo.update { copy(hideInLandscape = v) } }
+            GroupToggle(Pos.Middle, Icons.Rounded.ScreenRotation, tr("Показывать в альбомной", "Show in landscape"),
+                tr("Выключено — не мешает играм и видео; тонкая настройка — в «Display»", "Off — stays out of games and videos; fine-tune it in Display"),
+                s.showInLandscape, color = Tile.Gray) { v -> SettingsRepo.update { copy(showInLandscape = v) } }
             GroupToggle(Pos.Last, Icons.Rounded.Apps, tr("Прятать плеер в его приложении", "Hide the player in its own app"),
                 tr("Карточка музыки не показывается, пока открыт сам плеер", "The music card hides while the player itself is open"),
                 s.hideWhenPlayerOpen, color = Tile.Blue) { v -> SettingsRepo.update { copy(hideWhenPlayerOpen = v) } }
