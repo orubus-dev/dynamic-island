@@ -6,11 +6,14 @@ import android.hardware.camera2.CameraManager
 import android.media.AudioManager
 import android.media.AudioRecordingConfiguration
 import android.net.ConnectivityManager
+import android.net.TetheringManager
+import android.os.Build
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Face
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.WifiTethering
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.core.content.ContextCompat
 import app.orubus.island.core.IslandBus
 import app.orubus.island.core.Notice
 import app.orubus.island.core.NoticeStyle
@@ -29,9 +32,9 @@ import kotlinx.coroutines.launch
  * статус хотспота и демонстрация Face Unlock.
  *
  * Микрофон — AudioRecordingCallback, камера — CameraManager.AvailabilityCallback.
- * Хотспот: раз в 2 секунды — системный список tethered-интерфейсов (ConnectivityManager,
- * скрытый, но стабильный с API 14 метод getTetheredIfaces) и резерв по именам интерфейсов
- * (ap0/swlan0/softap/rndis/ncm) — точка доступа видится быстро и на любом устройстве.
+ * Хотспот: с Android 11 — публичный TetheringManager, события приходят мгновенно без опроса;
+ * на старых версиях — раз в 2 секунды скрытый (но стабильный с API 14) список
+ * getTetheredIfaces и резерв по именам поднятых интерфейсов (ap0/swlan0/softap/rndis/ncm).
  */
 object PrivacyMonitor {
     private var mic = false
@@ -39,6 +42,8 @@ object PrivacyMonitor {
     private var started = false
     private var pollJob: Job? = null
     private var hotspotLast = false
+    private var tetherManager: TetheringManager? = null
+    private var tetherCallback: TetheringManager.TetheringEventCallback? = null
 
     fun start(context: Context, scope: CoroutineScope) {
         if (started) return
@@ -75,13 +80,15 @@ object PrivacyMonitor {
             }
         }, null)
 
-        // Хотспот: сначала текущее состояние (без плашки), дальше — проверка каждые 2 секунды.
-        // TetheringManager скрыт от обычных приложений, поэтому используем стабильный с API 14
-        // ConnectivityManager.getTetheredIfaces через рефлексию и резерв по именам интерфейсов.
+        // Хотспот: сначала текущее состояние (без плашки), дальше — события или опрос.
         hotspotLast = tetheredNow(app)
         IslandBus.hotspotOn.value = hotspotLast
 
-        // Резервная и основная проверка: каждые 2 секунды, чтобы плашка приходила сразу
+        // Основной путь (Android 11+): публичный TetheringManager присылает tethered-интерфейсы
+        // событием — плашка приходит мгновенно, без опроса. Не вышло (старее/ограничения) — опрос ниже.
+        if (Build.VERSION.SDK_INT >= 30 && registerTetheringEvents(app)) return
+
+        // Резерв: проверка каждые 2 секунды, чтобы плашка приходила почти сразу
         pollJob = scope.launch(Dispatchers.Default) {
             while (isActive) {
                 delay(2_000)
@@ -96,10 +103,30 @@ object PrivacyMonitor {
         started = false
         pollJob?.cancel()
         pollJob = null
+        runCatching { tetherCallback?.let { tetherManager?.unregisterTetheringEventCallback(it) } }
+        tetherCallback = null
+        tetherManager = null
         IslandBus.micActive.value = false
         IslandBus.camActive.value = false
         IslandBus.hotspotOn.value = false
     }
+
+    /** Подписка на события хотспота (публичный API с Android 11). true — опрос не нужен. */
+    private fun registerTetheringEvents(app: Context): Boolean = runCatching {
+        val cm = app.getSystemService(ConnectivityManager::class.java)
+        val tm = runCatching { app.getSystemService(TetheringManager::class.java) }.getOrNull()
+            ?: ConnectivityManager::class.java.getMethod("getTetheringManager").invoke(cm) as? TetheringManager
+            ?: return@runCatching false
+        val cb = object : TetheringManager.TetheringEventCallback() {
+            override fun onTetheredInterfacesChanged(interfaces: List<String>) {
+                setHotspot(interfaces.isNotEmpty())
+            }
+        }
+        tm.registerTetheringEventCallback(ContextCompat.getMainExecutor(app), cb)
+        tetherManager = tm
+        tetherCallback = cb
+        true
+    }.getOrDefault(false)
 
     /** Подключён ли хотспот прямо сейчас: системный список tethered-интерфейсов (скрытый, но стабильный). */
     private fun tetheredNow(context: Context): Boolean = runCatching {
@@ -109,9 +136,11 @@ object PrivacyMonitor {
         ifaces.isNotEmpty()
     }.getOrDefault(false)
 
-    /** Резерв по именам интерфейсов: ap0/swlan0/softap — плюс USB-модем rndis/ncm. */
+    /** Резерв по именам интерфейсов: ap0/swlan0/softap — плюс USB-модем rndis/ncm. Только поднятые. */
     private fun interfacesLookHotspot(): Boolean = runCatching {
         java.net.NetworkInterface.getNetworkInterfaces()?.toList()?.any { n ->
+            // Интерфейс может существовать, но быть выключен (ap0 лежит на многих телефонах всегда)
+            if (!runCatching { n.isUp }.getOrDefault(false)) return@any false
             val name = n.name.lowercase()
             name.startsWith("ap") || name.contains("swlan") || name.contains("softap") ||
                 name.startsWith("rndis") || name.startsWith("ncm")

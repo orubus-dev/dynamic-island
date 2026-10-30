@@ -272,7 +272,8 @@ fun Modifier.volumeSlide(
         var last = down.position
         while (true) {
             val ev = awaitPointerEvent(PointerEventPass.Main)
-            val c = ev.changes.firstOrNull { it.id == down.id } ?: ev.changes.firstOrNull() ?: continue
+            // Только исходный палец двигает громкость: второй палец не должен дёргать ползунок
+            val c = ev.changes.firstOrNull { it.id == down.id } ?: continue
             if (!c.pressed) {
                 onEnd()
                 break
@@ -295,6 +296,10 @@ object IslandVolume {
         private set
     private var audio: AudioManager? = null
     private var startLevel = 0
+    // Весь путь пальца с начала жеста: шаг громкости считается от полного пути,
+    // а не от дельты одного события (событие несёт лишь несколько пикселей).
+    private var accX = 0f
+    private var accY = 0f
 
     fun attach(context: android.content.Context) {
         if (audio == null) {
@@ -307,16 +312,19 @@ object IslandVolume {
     fun begin() {
         startLevel = audio?.getStreamVolume(AudioManager.STREAM_MUSIC) ?: 0
         level = startLevel
+        accX = 0f
+        accY = 0f
         mode = true
     }
 
-    /** Скольжение: из px в шаги громкости — примерно 52 dp на шаг, вертикаль вверх — громче. */
+    /** Скольжение: полный путь из px в шаги громкости — примерно 52 dp на шаг, вертикаль вверх — громче. */
     fun drag(dx: Float, dy: Float, pxPerStep: Float) {
         val a = audio ?: return
-        val horizontal = (dx / pxPerStep).roundToInt()
-        val vertical = (-dy / (pxPerStep * 1.25f)).roundToInt()
+        accX += dx
+        accY += dy
+        val horizontal = (accX / pxPerStep).roundToInt()
+        val vertical = (-accY / (pxPerStep * 1.25f)).roundToInt()
         val step = if (abs(horizontal) >= abs(vertical)) horizontal else vertical
-        if (step == 0) return
         val next = (startLevel + step).coerceIn(0, max)
         if (next != level) {
             level = next
