@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Слой для тематических значков Android 13+: только силуэт капсулы с обложкой
+     и эквалайзером; система сама красит его в цвет темы. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M37,43 H71 A11,11 0 0 1 71,65 H37 A11,11 0 0 1 37,43 Z M32,48 h8 a2,2 0 0 1 2,2 v8 a2,2 0 0 1 -2,2 h-8 a2,2 0 0 1 -2,-2 v-8 a2,2 0 0 1 2,-2 Z M68,50 h2 v8 h-2 Z M72,47 h2 v14 h-2 Z M76,51 h2 v6 h-2 Z" />
+</vector>

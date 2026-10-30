@@ -44,6 +44,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -59,6 +60,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -96,6 +98,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.orubus.island.core.BatteryInfo
 import app.orubus.island.core.ChronoInfo
 import app.orubus.island.core.Controls
@@ -153,6 +156,7 @@ fun IslandOverlay(
     val timer by IslandBus.timer.collectAsState()
     val stopwatch by IslandBus.stopwatch.collectAsState()
     val notice by IslandBus.notice.collectAsState()
+    val noticeStack by IslandBus.noticeStack.collectAsState()
     val battery by IslandBus.battery.collectAsState()
     val foreground by IslandBus.foregroundPackage.collectAsState()
     val expanded by IslandBus.expanded.collectAsState()
@@ -250,6 +254,10 @@ fun IslandOverlay(
             if (s.cardCharging && battery.charging) persistent += Act.ChargingA(battery)
         }
         // Будильник — тише всех: показывается, только когда больше ничего нет, и не уходит в пузырь
+        // Стопка свернутых уведомлений — значок со счётчиком: ниже карточек, но выше будильника.
+        // Она не даёт острову исчезнуть после смахнутой плашки — вместо пустой капсулы теперь значок.
+        // В игровом режиме с «Не показывать остров» значок прячется вместе со всем островом
+        if (noticeStack.isNotEmpty() && !gameSilent) persistent += Act.StackA(noticeStack)
         val alarm = nextAlarm
         if (s.cardAlarm && alarm != null && alarm.triggerAt - alarmNow in 1..ALARM_LEAD_MS) persistent += Act.AlarmA(alarm)
 
@@ -291,7 +299,7 @@ fun IslandOverlay(
     val bubbleVisible = secondary != null && !showExpanded
     // «Авто-расширение»: активный остров чуть толще, пока показывает музыку, таймер или зарядку
     val sEff = if (s.autoExpandActive && !showExpanded && primary !is Act.Idle &&
-        primary !is Act.NoticeA && !calibrating && !previewing
+        primary !is Act.NoticeA && primary !is Act.StackA && !calibrating && !previewing
     ) {
         s.copy(activeExtra = (s.activeExtra + 3).coerceAtMost(14))
     } else {
@@ -688,9 +696,9 @@ private fun IslandBody(
                     }
                 }
                 detectTapGestures(
-                    onTap = {
+                    onTap = { pos ->
                         haptic()
-                        onTap(context, current, isExpanded, settings)
+                        onTap(context, current, isExpanded, settings, pos, size.width.toFloat())
                     },
                     onDoubleTap = onDouble,
                     onLongPress = onLong,
@@ -716,8 +724,10 @@ private fun IslandBody(
                     SwipeCaps(
                         canExpand = !isExpanded && settings.swipeExpand && !act.transient && (act !is Act.Idle || settings.idleExpand),
                         canCollapse = isExpanded,
-                        canDismiss = !isExpanded && (act is Act.NoticeA || act is Act.PayA || (act is Act.CallA && act.c.incoming)),
+                        canDismiss = !isExpanded && (act is Act.NoticeA || act is Act.PayA || act is Act.StackA || (act is Act.CallA && act.c.incoming)),
                         canTracks = !isExpanded && act is Act.MediaA && settings.swipeTracks,
+                        canMinimize = !isExpanded && act is Act.NoticeA,
+                        canBrowse = !isExpanded && act is Act.StackA && act.items.size > 1,
                     )
                 },
                 onPull = { f -> scope.launch { pull.snapTo(f) } },
@@ -740,6 +750,13 @@ private fun IslandBody(
                             // Пустому острову после смахнутой плашки — выход из-под камеры
                             IslandBus.notchPopAt = SystemClock.elapsedRealtime()
                         }
+                        // Стопку смахнули вбок далеко — очистить целиком: и значок, и уведомления в шторке, если включено
+                        is Act.StackA -> {
+                            if (settings.swipeClearNotif) act.items.forEach { it.message?.key?.let(NotifListener::cancelKey) }
+                            IslandBus.stackBrowse.value = -1
+                            IslandBus.noticeStack.value = emptyList()
+                            IslandBus.notchPopAt = SystemClock.elapsedRealtime()
+                        }
                         // Подсказку оплаты тоже можно смахнуть
                         is Act.PayA -> {
                             PayMonitor.clearReady()
@@ -754,6 +771,17 @@ private fun IslandBody(
                         else -> Unit
                     }
                     swipe.reset()
+                },
+                // Плашку смахнули вверх — она не исчезает, а сворачивается в значок со счётчиком
+                onMinimize = {
+                    val act = current
+                    if (act is Act.NoticeA) IslandBus.minimizeNotice(act.n)
+                    swipe.reset()
+                },
+                // Стопку листают вбок: остров остаётся на месте, меняется только уведомление
+                onBrowse = { next ->
+                    haptic()
+                    IslandBus.browseStack(next)
                 },
                 onTracks = { next ->
                     haptic()
@@ -907,12 +935,16 @@ private fun GraphicsLayerScope.blurLayer(dp: Float) {
     }
 }
 
-private fun onTap(context: Context, act: Act, expanded: Boolean, s: IslandSettings) {
+private fun onTap(context: Context, act: Act, expanded: Boolean, s: IslandSettings, pos: Offset, width: Float) {
     if (expanded) {
         Controls.collapse()
         return
     }
     when (act) {
+        is Act.StackA -> {
+            // Слева — быстрые кнопки («быстрые плитки»), счётчик справа — достать уведомление из стопки
+            if (pos.x * 2f <= width) Controls.expand(act.id) else IslandBus.restoreFromStack()
+        }
         is Act.NoticeA -> {
             // Пока вводят ответ, нажатие по карточке не должно открывать приложение
             if (IslandBus.reply.value != null) return
@@ -999,6 +1031,31 @@ private fun Bubble(act: Act, s: IslandSettings) {
             is Act.CallA -> Icon(Ios.call, null, tint = Tints.Green, modifier = Modifier.size(inner * 0.7f))
             is Act.LiveA -> LiveGlyph(act.l, inner, liveTint(act.l.kind))
             is Act.ChargingA -> Icon(Ios.flash, null, tint = Tints.Green, modifier = Modifier.size(inner * 0.7f))
+            is Act.StackA -> {
+                // Стопка в пузыре: значок последнего уведомления и счётчик в углу
+                val n = act.items.lastOrNull()
+                val bmp = n?.message?.appIcon ?: n?.appIcon
+                if (bmp != null) {
+                    Image(bmp, null, Modifier.size(inner * 0.82f).clip(RoundedCornerShape(inner * 0.22f)))
+                } else {
+                    Icon(Ios.bell, null, tint = Tints.Lavender, modifier = Modifier.size(inner * 0.7f))
+                }
+                if (act.items.size > 1) {
+                    Box(
+                        Modifier
+                            .align(Alignment.TopEnd)
+                            .size(inner * 0.44f)
+                            .clip(CircleShape)
+                            .background(Tints.Lavender),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            "${act.items.size}", color = StackInk,
+                            fontSize = (inner.value * 0.24f).sp, style = Digits, maxLines = 1,
+                        )
+                    }
+                }
+            }
             else -> Unit
         }
     }

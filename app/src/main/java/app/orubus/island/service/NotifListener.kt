@@ -230,6 +230,8 @@ object NotificationParser {
         LiveParser.forget(key)
         ClockControl.forget(key)
         LiveDebug.forget(key)
+        // Уведомление убрали из шторки — если оно жило свернутым в значке со счётчиком, убрать и оттуда
+        IslandBus.dropStackKey(key)
         if (key in IslandBus.calls.value) IslandBus.calls.value = IslandBus.calls.value - key
         if (key in IslandBus.progress.value) IslandBus.progress.value = IslandBus.progress.value - key
         if (key in IslandBus.chrono.value) IslandBus.chrono.value = IslandBus.chrono.value - key

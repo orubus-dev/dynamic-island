@@ -12,14 +12,17 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -34,6 +37,7 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Face
 import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -298,6 +302,9 @@ fun CompactContent(act: Act, s: IslandSettings, wideWidth: Dp) {
 
         is Act.NoticeA -> NoticeCompact(act.n, s, wideWidth)
 
+        // Стопка свернутых уведомлений: значок последнего со счётчиком справа
+        is Act.StackA -> StackCard(act.items, s)
+
         is Act.PayA -> PayReady(tr("Оплата", "Pay"), tr("К терминалу", "Hold near reader"), act.p.icon, s, wideWidth)
 
     }
@@ -350,10 +357,10 @@ fun CompactRow(
         var r = subcompose("r") { Box(contentAlignment = Alignment.Center, content = right) }.first().measure(loose)
         val base = baseWidth.roundToPx()
         val sideNeed = maxOf(l.width, r.width)
-        // В узкой капсуле содержимое сначала уменьшается (до 70%) — как будто нарисовано мельче, —
-        // и только если и так не помещается, капсулу раздвигает
+        // В узкой капсуле содержимое сначала уменьшается (не ниже 82% — дальше текст читается плохо) —
+        // как будто нарисовано мельче, — и только если и так не помещается, капсулу раздвигает
         val sideRoom = (base - gapPx) / 2 - pad
-        val k = if (shrink && sideNeed > sideRoom && sideRoom > 0) (sideRoom.toFloat() / sideNeed).coerceIn(0.7f, 1f) else 1f
+        val k = if (shrink && sideNeed > sideRoom && sideRoom > 0) (sideRoom.toFloat() / sideNeed).coerceIn(0.82f, 1f) else 1f
         if (k < 1f) {
             val small = Density(density.density * k, density.fontScale)
             l = subcompose("ls") {
@@ -463,6 +470,107 @@ private fun NoticeCompact(n: Notice, s: IslandSettings, wideWidth: Dp) {
         n.style == NoticeStyle.CAM -> CamPill(n, s)
         n.style == NoticeStyle.PILL || n.title.isBlank() && n.state == null -> PillNotice(n, s)
         else -> WideNotice(n, s, wideWidth)
+    }
+}
+
+/** Чем писать счётчик — тёмным по сиреневому, как на сиреневых кнопках карточек. */
+internal val StackInk = Color(0xFF1C1B22)
+
+/**
+ * Стопка свернутых уведомлений: значок последнего уведомления и счётчик справа.
+ * Смахивание вбок листает стопку — значок на миг превращается в карточку с именем отправителя,
+ * и остров всё это время не гаснет. Нажатие слева открывает быстрые кнопки, нажатие по счётчику
+ * достаёт уведомление целиком (обрабатывается в IslandOverlay, здесь только вид).
+ */
+@Composable
+private fun StackCard(items: List<Notice>, s: IslandSettings) {
+    val h = activeHeight(s)
+    val browseIdx by IslandBus.stackBrowse.collectAsState()
+    val locked by IslandBus.locked.collectAsState()
+    val browsing = browseIdx in items.indices
+    // Просмотренное уведомление само возвращается в значок со счётчиком
+    LaunchedEffect(browseIdx) {
+        if (browseIdx >= 0) {
+            delay(4500)
+            IslandBus.stackBrowse.value = -1
+        }
+    }
+    val shown = items.getOrNull(if (browsing) browseIdx else items.lastIndex) ?: items.lastOrNull() ?: return
+    val pop = remember(items.size, browseIdx) { Animatable(if (s.reduceEffects) 1f else 0.55f) }
+    LaunchedEffect(items.size, browseIdx) { pop.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = 340f)) }
+    val badgeSize = h * 0.58f
+    AnimatedContent(
+        targetState = browsing,
+        contentKey = { it },
+        transitionSpec = {
+            ((fadeIn(islandSpec(s)) + scaleIn(islandSpec(s), initialScale = 0.82f, transformOrigin = TransformOrigin(0.5f, 0f))) togetherWith
+                (fadeOut(islandSpec(s)) + scaleOut(islandSpec(s), targetScale = 0.82f, transformOrigin = TransformOrigin(0.5f, 0f))))
+                .using(SizeTransform(clip = false) { _, _ -> islandSpec(s) })
+        },
+        label = "stack",
+    ) { browse ->
+        if (!browse) {
+            // Значок со счётчиком: значок последнего уведомления слева, сиреневый счётчик справа
+            Row(
+                Modifier.height(h).padding(horizontal = h * 0.3f),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                StackIcon(shown, h * 0.6f, pop.value)
+                Spacer(Modifier.width(h * 0.36f))
+                StackBadge(items.size, badgeSize)
+            }
+        } else {
+            // Листают: карточка с отправителем, счётчик остаётся справа
+            Row(
+                Modifier
+                    .width((h * 6f).coerceAtMost(messageWidth()))
+                    .height(h)
+                    .padding(horizontal = h * 0.3f),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                StackIcon(shown, h * 0.6f, pop.value)
+                Spacer(Modifier.width(h * 0.26f))
+                val hidden = locked && shown.message?.sensitive == true
+                FitText(
+                    when {
+                        hidden -> shown.message?.appName ?: shown.title
+                        shown.title.isNotBlank() -> shown.title
+                        else -> shown.message?.appName ?: ""
+                    },
+                    Color(s.textColor),
+                    15.sp, 11.sp, FontWeight.SemiBold,
+                    Modifier.weight(1f),
+                    style = TextStyle(fontFamily = s.fontFamily.family()),
+                )
+                Spacer(Modifier.width(h * 0.26f))
+                StackBadge(items.size, badgeSize)
+            }
+        }
+    }
+}
+
+/** Значок уведомления в стопке: значок приложения, а без него — значок события. */
+@Composable
+private fun StackIcon(n: Notice, size: Dp, pop: Float) {
+    val bmp = n.message?.appIcon ?: n.appIcon
+    if (bmp != null) {
+        Image(bmp, null, Modifier.size(size).scale(pop).clip(RoundedCornerShape(size * 0.27f)))
+    } else {
+        Icon(n.icon, null, tint = n.tint, modifier = Modifier.size(size).scale(pop))
+    }
+}
+
+/** Сиреневый счётчик непрочитанных — как у значка приложения на iPhone. */
+@Composable
+private fun StackBadge(count: Int, size: Dp) {
+    Box(
+        Modifier.size(size).clip(CircleShape).background(Tints.Lavender),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            "$count", color = StackInk, fontSize = (size.value * 0.46f).sp,
+            style = Digits, maxLines = 1, softWrap = false,
+        )
     }
 }
 

@@ -19,6 +19,12 @@ sealed class Act(val id: String, val transient: Boolean = false) {
 
     data object Idle : Act("idle")
     data class NoticeA(val n: Notice) : Act("notice", transient = true)
+    /**
+     * Свернутые уведомления — значок со счётчиком: смахнули плашку вверх, и она превратилась
+     * в значок последнего уведомления со счётчиком справа. Не transient: может уйти в пузырь
+     * и раскрыться на быстрые кнопки.
+     */
+    data class StackA(val items: List<Notice>) : Act("stack")
     data class TimerA(val t: TimerState) : Act("timer")
     data class StopwatchA(val w: StopwatchState) : Act("stopwatch")
     data class TorchA(val t: TorchState) : Act("torch")

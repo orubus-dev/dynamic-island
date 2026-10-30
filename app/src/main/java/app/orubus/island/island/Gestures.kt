@@ -56,6 +56,10 @@ data class SwipeCaps(
     val canCollapse: Boolean,
     val canDismiss: Boolean,
     val canTracks: Boolean,
+    /** Смахнули вверх — плашка не исчезает, а сворачивается в значок со счётчиком */
+    val canMinimize: Boolean = false,
+    /** Горизонтальный свайп листает стопку свернутых уведомлений, а не смахивает её */
+    val canBrowse: Boolean = false,
 )
 
 /** Смещение карточки под пальцем: читается при рисовании, поэтому жест не пересобирает остров. */
@@ -131,6 +135,8 @@ fun Modifier.islandSwipe(
     onExpand: () -> Unit,
     onCollapse: () -> Unit,
     onDismiss: () -> Unit,
+    onMinimize: () -> Unit = {},
+    onBrowse: (next: Boolean) -> Unit = {},
     onTracks: (next: Boolean) -> Unit,
 ) = pointerInput(Unit) {
     val animScope = CoroutineScope(coroutineContext + SupervisorJob())
@@ -151,6 +157,8 @@ fun Modifier.islandSwipe(
             val c = caps()
             when (axis) {
                 1 -> when {
+                    // Стопка уведомлений листается свайпом: палец тянет её чуть-чуть, как пузырек треков
+                    c.canBrowse -> state.x.floatValue = (dx * 0.22f).coerceIn(-sidePx * 0.45f, sidePx * 0.45f)
                     c.canDismiss -> {
                         state.x.floatValue = dx
                         state.alpha.floatValue = 1f - (abs(dx) / (size.width.toFloat() * 0.9f)).coerceIn(0f, 0.6f)
@@ -159,7 +167,8 @@ fun Modifier.islandSwipe(
                     else -> state.x.floatValue = (dx * 0.12f).coerceIn(-12.dp.toPx(), 12.dp.toPx())
                 }
                 2 -> when {
-                    dy < 0f && c.canDismiss -> {
+                    // Вверх тянут и для смахивания, и для сворачивания в значок — картинка одна
+                    dy < 0f && (c.canDismiss || c.canMinimize) -> {
                         state.y.floatValue = dy
                         state.alpha.floatValue = 1f - (-dy / (dismissPx * 2.2f)).coerceIn(0f, 0.6f)
                     }
@@ -181,12 +190,18 @@ fun Modifier.islandSwipe(
                 when (axis) {
                     1 -> {
                         val far = abs(dx) > size.width * 0.32f || (abs(v.x) > 1500f && sign(v.x) == sign(dx))
+                        val flick = abs(dx) > sidePx || (abs(v.x) > 1200f && abs(dx) > slop * 2)
                         when {
+                            // Листание стопки важнее смахивания: значок со счётчиком не пропадает от свайпа вбок
+                            c.canBrowse && flick -> {
+                                onBrowse(dx < 0)
+                                springBack(animScope, state)
+                            }
                             c.canDismiss && far -> {
                                 val dir = if (sign(dx) == 0f) 1f else sign(dx)
                                 flyOut(animScope, state, dir * size.width * 1.4f, 0f, onDismiss)
                             }
-                            c.canTracks && (abs(dx) > sidePx || (abs(v.x) > 1200f && abs(dx) > slop * 2)) -> {
+                            c.canTracks && flick -> {
                                 // Толкнуть влево — следующий трек, вправо — предыдущий
                                 onTracks(dx < 0)
                                 springBack(animScope, state)
@@ -197,6 +212,8 @@ fun Modifier.islandSwipe(
                     2 -> {
                         val upFar = -dy > dismissPx || v.y < -1400f
                         when {
+                            // Вверх — свернуть в значок со счётчиком; у того, что свернуться не может, — смахивание
+                            dy < 0f && upFar && c.canMinimize -> flyOut(animScope, state, 0f, -size.height * 1.6f, onMinimize)
                             dy < 0f && c.canDismiss && upFar -> flyOut(animScope, state, 0f, -size.height * 1.6f, onDismiss)
                             dy > 0f && c.canExpand && (dy > dismissPx || v.y > 1100f) -> {
                                 onExpand()

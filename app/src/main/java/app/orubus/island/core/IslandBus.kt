@@ -49,6 +49,14 @@ object IslandBus {
     val timer = MutableStateFlow<TimerState?>(null)
     val stopwatch = MutableStateFlow<StopwatchState?>(null)
     val notice = MutableStateFlow<Notice?>(null)
+    /**
+     * Свернутые уведомления: смахнули плашку вверх — она превращается в значок со счётчиком
+     * у выреза. Новые кладутся в конец, сверху — последнее. Живут, пока их не откроют,
+     * не смахнут или пока уведомление не исчезнет из шторки.
+     */
+    val noticeStack = MutableStateFlow<List<Notice>>(emptyList())
+    /** Какое уведомление из стопки сейчас просмотривают свайпом, -1 — никто (значок со счётчиком) */
+    val stackBrowse = MutableStateFlow(-1)
     /** Идёт ввод ответа на уведомление: окну острова нужен фокус, чтобы показать клавиатуру */
     val reply = MutableStateFlow<ReplyState?>(null)
     /** Наклон телефона от -1 до 1: по нему сдвигаются блики Liquid Glass */
@@ -159,6 +167,46 @@ object IslandBus {
         queue.trySend(n)
     }
 
+    /** Смахнули плашку вверх: уведомление прячется в значок со счётчиком, а не исчезает */
+    fun minimizeNotice(n: Notice) {
+        if (reply.value?.noticeId == n.id) reply.value = null
+        noticeStack.value = (noticeStack.value + n).takeLast(STACK_MAX)
+        stackBrowse.value = -1
+        // Сама плашка уходит со сцены — её место сразу занимает значок со счётчиком
+        if (notice.value?.id == n.id) notice.value = null
+    }
+
+    /** Достать уведомление из стопки: последнее, если не просмотривают, иначе — то, на которое смотрят */
+    fun restoreFromStack() {
+        val list = noticeStack.value
+        if (list.isEmpty()) return
+        val i = stackBrowse.value.takeIf { it in list.indices } ?: list.lastIndex
+        val n = list[i]
+        noticeStack.value = list.minus(n)
+        stackBrowse.value = -1
+        // Пробная плашка без гасителя и тихих часов: человек сам попросил её показать
+        queue.trySend(n)
+    }
+
+    /** Листают стопку свайпом: влево — к более новым, вправо — к более старым */
+    fun browseStack(next: Boolean) {
+        val list = noticeStack.value
+        if (list.size < 2) {
+            stackBrowse.value = -1
+            return
+        }
+        val from = stackBrowse.value.takeIf { it in list.indices } ?: list.lastIndex
+        val to = ((from + if (next) 1 else -1) + list.size) % list.size
+        stackBrowse.value = to
+    }
+
+    /** Уведомление убрали из шторки — если оно жило в значке, убрать и оттуда */
+    fun dropStackKey(key: String) {
+        if (noticeStack.value.none { it.message?.key == key }) return
+        noticeStack.value = noticeStack.value.filterNot { it.message?.key == key }
+        stackBrowse.value = -1
+    }
+
     @Volatile
     private var lastShieldNotice = 0L
 
@@ -186,6 +234,9 @@ object IslandBus {
 
     /** Окно мгновенного подавления: повторы, пришедшие в эти миллисекунды, гасятся всегда */
     private const val BURST_MS = 900L
+
+    /** Сколько уведомлений максимум живет в значке: самые свежие, старые вытесняются */
+    private const val STACK_MAX = 8
 }
 
 /** Команды службе: скриншот без острова, блокировка экрана, выключение острова (для банков). */

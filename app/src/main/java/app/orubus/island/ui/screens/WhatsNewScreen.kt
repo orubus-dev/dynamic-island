@@ -19,6 +19,8 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Bookmarks
+import androidx.compose.material.icons.rounded.Contrast
 import androidx.compose.material.icons.rounded.Face
 import androidx.compose.material.icons.rounded.Grain
 import androidx.compose.material.icons.rounded.Headset
@@ -58,6 +60,17 @@ private data class WhatsNewPage(
 )
 
 private fun pages() = listOf(
+    WhatsNewPage(
+        Icons.Rounded.Bookmarks, tr("Смахните вверх — значок со счётчиком", "Swipe up — an icon with a badge"),
+        tr("Уведомления больше не исчезают бесследно: смахнули плашку вверх — она превращается в значок последнего уведомления со счётчиком справа. Свайп вбок листает стопку, и остров не гаснет; тап слева открывает быстрые кнопки, тап по счётчику достаёт уведомление.",
+            "Notifications no longer vanish without a trace: swipe a banner up and it turns into an icon of the last notification with a count badge. Swipe sideways to browse the stack while the island stays alive; tap the left side for the quick tiles, tap the badge to bring the notification back."),
+        tr("Попробовать", "Try it now"),
+    ),
+    WhatsNewPage(
+        Icons.Rounded.Contrast, tr("Значок — монохром", "The icon, in monochrome"),
+        tr("Тот же остров с обложкой и эквалайзером, но только в чёрном и белом — под стать Liquid Glass в самом приложении. Тематические значки Android 13+ тоже стали чище.",
+            "The same island with the cover and equalizer, but strictly in black and white to match the app's Liquid Glass. The Android 13+ themed icon is cleaner now too."),
+    ),
     WhatsNewPage(
         Icons.Rounded.HealthAndSafety, tr("Экранный щит и свой adb", "Popup shield with built-in adb"),
         tr("Системные всплывающие плашки — второй источник двойных поп-апов. Щит выключает их в один тап, а встроенный в остров adb (как у Shizuku) сам подключается к отладке и выполняет команды.",

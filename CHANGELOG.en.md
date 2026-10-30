@@ -6,6 +6,15 @@ Versioning: the second number (1.5, 1.6…) means new and changed features, the 
 
 > Since 1.6.1 the app and the island speak English (Features → General → Language). Earlier versions were in Russian only, so older entries give the Russian label in brackets.
 
+## [1.11.0] — 2026-10-31
+
+- 🔖 **Swipe up — an icon with a badge** — notifications no longer vanish without a trace: swipe a banner up and it turns into an icon of the last notification with a count badge on the right. After a swiped banner the island no longer disappears — the badge stays instead of an empty capsule, and "Hide the empty island" no longer hides it.
+- 👈 **Tap the left side — quick tiles** — the left half of the badge opens the familiar quick actions of the expanded island (timer, stopwatch, flashlight…), while tapping the count badge brings the notification back in full.
+- ↔️ **Swipe sideways to browse the stack** — flip through minimized notifications left and right: the icon morphs into a card with the sender's name while the island stays alive and never closes. Swipe up on the badge to clear the whole stack at once.
+- ✏️ **Text no longer squeezed** — capsule content shrinks to no less than 82% instead of 70%: time, captions and "Unlocked" stay readable; if it still doesn't fit, the capsule widens.
+- ⚫ **The app icon, in monochrome** — the same island with the cover and equalizer, but strictly in black and white: a white capsule with knocked-out details on a black background; the Android 13+ themed icon is cleaner too.
+- 🫧 **Live clearing in the stack** — a notification removed from the shade disappears from the count badge instantly.
+
 ## [1.10.1] — 2026-10-30
 
 - 📵 **Popup shield with built-in adb** — system heads-up banners (the second source of double pop-ups) turn off with one button when WRITE_SECURE_SETTINGS is granted. The island now carries its own adb client, Shizuku/LADB-style: enter the debugging address and port and it connects by itself (RSA, with the "Allow debugging" dialog) and runs the shield commands. Screen: Permissions → Popup shield.
