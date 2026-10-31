@@ -39,7 +39,7 @@ class TimerAlarm(private val context: Context, private val scope: CoroutineScope
     private val alarms = context.getSystemService(AlarmManager::class.java)
     private val wakeIntent = PendingIntent.getBroadcast(
         context, 0,
-        Intent(TIMER_WAKE_ACTION).setClassName(context, TimerWakeReceiver::class.java),
+        Intent(TIMER_WAKE_ACTION).setClass(context, TimerWakeReceiver::class.java),
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
     )
 
