@@ -23,6 +23,7 @@ import androidx.compose.material.icons.rounded.EmojiEmotions
 import androidx.compose.material.icons.rounded.FormatLineSpacing
 import androidx.compose.material.icons.rounded.Gesture
 import androidx.compose.material.icons.rounded.Language
+import androidx.compose.material.icons.rounded.Layers
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.LightMode
 import androidx.compose.material.icons.rounded.MusicNote
@@ -324,6 +325,12 @@ fun NotificationsScreen(onBack: () -> Unit) {
                 tr("Показывать и уведомления приложения, которое сейчас на экране", "Also show notifications from the app that's on screen"),
                 s.msgInApp, color = Tile.Teal) { v ->
                 SettingsRepo.update { copy(msgInApp = v) }
+            }
+            GroupToggle(Pos.Middle, Icons.Rounded.Layers, tr("Свёрнутые уведомления", "Stacked notifications"),
+                tr("Смахнутая вверх плашка ждёт у выреза — полноразмерная, листается свайпом вбок",
+                    "A banner swiped up waits by the cutout at full size — browse the stack with sideways swipes"),
+                s.notifStack, color = Tile.Purple) { v ->
+                SettingsRepo.update { copy(notifStack = v) }
             }
             GroupSlider(
                 Pos.Last, Icons.Rounded.FormatLineSpacing, tr("Строк текста", "Text lines"),

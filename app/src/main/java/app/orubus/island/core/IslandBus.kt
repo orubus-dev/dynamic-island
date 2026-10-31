@@ -50,12 +50,12 @@ object IslandBus {
     val stopwatch = MutableStateFlow<StopwatchState?>(null)
     val notice = MutableStateFlow<Notice?>(null)
     /**
-     * Свернутые уведомления: смахнули плашку вверх — она превращается в значок со счётчиком
-     * у выреза. Новые кладутся в конец, сверху — последнее. Живут, пока их не откроют,
-     * не смахнут или пока уведомление не исчезнет из шторки.
+     * Свернутые уведомления: смахнули плашку вверх — она ждёт у выреза полноразмерной плашкой,
+     * как у обычного уведомления. Новые кладутся в конец, сверху — последнее. Живут, пока их
+     * не откроют, не смахнут или пока уведомление не исчезнет из шторки.
      */
     val noticeStack = MutableStateFlow<List<Notice>>(emptyList())
-    /** Какое уведомление из стопки сейчас просмотривают свайпом, -1 — никто (значок со счётчиком) */
+    /** Какое уведомление из стопки сейчас показывают свайпом, -1 — самое последнее */
     val stackBrowse = MutableStateFlow(-1)
     /** Идёт ввод ответа на уведомление: окну острова нужен фокус, чтобы показать клавиатуру */
     val reply = MutableStateFlow<ReplyState?>(null)
@@ -185,15 +185,14 @@ object IslandBus {
     }
 
     /** Достать уведомление из стопки: последнее, если не просмотривают, иначе — то, на которое смотрят */
-    fun restoreFromStack() {
+    fun takeFromStack(): Notice? {
         val list = noticeStack.value
-        if (list.isEmpty()) return
+        if (list.isEmpty()) return null
         val i = stackBrowse.value.takeIf { it in list.indices } ?: list.lastIndex
         val n = list[i]
         noticeStack.value = list.minus(n)
         stackBrowse.value = -1
-        // Пробная плашка без гасителя и тихих часов: человек сам попросил её показать
-        queue.trySend(n)
+        return n
     }
 
     /** Листают стопку свайпом: влево — к более новым, вправо — к более старым */

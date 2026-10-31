@@ -1,8 +1,5 @@
-### The stack, at full banner size
-Swiping sideways on the count badge unfolds a regular-sized banner: the app, "N new notifications waiting for you" and "Clear all". The island never closes.
+### Stacked notifications, full size
+A banner swiped up stays by the cutout at exactly the size of a regular notification: the app header, the title, the message text, with "N waiting" and "Clear all" underneath. Swipe sideways to browse the stack, swipe up to clear it, tap to open the app.
 
-### Nine defects — fixed
-The built-in adb connects, the timer rings even after a crash, duplicates no longer eat live messages, and payment amounts don't collide.
-
-### "Camera · in use"
-The camera caption reads in full — no more clipping; "Hide on lock screen" and schedule boundaries work honestly now.
+### A switch in Notifications
+If the full-size card by the cutout is not for you — turn off "Stacked notifications" and a swiped-up banner simply goes away again. The 900 ms duplicate shield works as before: re-posts stay silenced, live messages come through.

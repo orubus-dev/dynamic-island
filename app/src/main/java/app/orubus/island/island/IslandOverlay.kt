@@ -253,11 +253,12 @@ fun IslandOverlay(
             if (s.cardProgress) progress.values.maxByOrNull { it.postTime }?.let { persistent += Act.ProgressA(it) }
             if (s.cardCharging && battery.charging) persistent += Act.ChargingA(battery)
         }
-        // Будильник — тише всех: показывается, только когда больше ничего нет, и не уходит в пузырь
-        // Стопка свернутых уведомлений — значок со счётчиком: ниже карточек, но выше будильника.
-        // Она не даёт острову исчезнуть после смахнутой плашки — вместо пустой капсулы теперь значок.
-        // В игровом режиме с «Не показывать остров» значок прячется вместе со всем островом
-        if (noticeStack.isNotEmpty() && !gameSilent) persistent += Act.StackA(noticeStack)
+        // Будильник — тише всех: показывается, только когда больше ничего нет, и не уходит в пузырь.
+        // Стопка свернутых уведомлений — полноразмерная плашка, как у обычного уведомления: ниже
+        // карточек, но выше будильника. Она не даёт острову исчезнуть после смахнутой плашки —
+        // вместо пустой капсулы теперь живая плашка, которую листают свайпом.
+        // В игровом режиме с «Не показывать остров» она прячется вместе со всем островом
+        if (s.notifStack && noticeStack.isNotEmpty() && !gameSilent) persistent += Act.StackA(noticeStack)
         val alarm = nextAlarm
         if (s.cardAlarm && alarm != null && alarm.triggerAt - alarmNow in 1..ALARM_LEAD_MS) persistent += Act.AlarmA(alarm)
 
@@ -521,6 +522,7 @@ private fun IslandBody(
         expanded && primary is Act.LiveA -> bigR
         expanded -> bigR
         primary is Act.NoticeA && (primary.n.style == NoticeStyle.MESSAGE || primary.n.style == NoticeStyle.EGG) -> bigR.coerceAtMost(34.dp)
+        primary is Act.StackA -> bigR.coerceAtMost(34.dp)
         primary is Act.NoticeA && primary.n.style == NoticeStyle.UPDATE -> bigR.coerceAtMost(38.dp)
         primary is Act.NoticeA && primary.n.style == NoticeStyle.WIDE && primary.n.title.isNotBlank() ->
             minOf(bigR, noticeHeight(s) / 2)
@@ -727,7 +729,7 @@ private fun IslandBody(
                         canDismiss = !isExpanded && (act is Act.NoticeA || act is Act.PayA || act is Act.StackA || (act is Act.CallA && act.c.incoming)),
                         canTracks = !isExpanded && act is Act.MediaA && settings.swipeTracks,
                         canMinimize = !isExpanded && act is Act.NoticeA,
-                        canBrowse = !isExpanded && act is Act.StackA && act.items.size > 1,
+                        canBrowse = !isExpanded && act is Act.StackA,
                     )
                 },
                 onPull = { f -> scope.launch { pull.snapTo(f) } },
@@ -772,10 +774,19 @@ private fun IslandBody(
                     }
                     swipe.reset()
                 },
-                // Плашку смахнули вверх — она не исчезает, а сворачивается в значок со счётчиком
+                // Плашку смахнули вверх — она не исчезает, а остаётся у выреза полноразмерной плашкой.
+                // Выключатель «Свёрнутые уведомления» возвращает прежнее поведение: плашка просто смахивается
                 onMinimize = {
                     val act = current
-                    if (act is Act.NoticeA) IslandBus.minimizeNotice(act.n)
+                    if (act is Act.NoticeA) {
+                        if (settings.notifStack) {
+                            IslandBus.minimizeNotice(act.n)
+                        } else {
+                            if (settings.swipeClearNotif) act.n.message?.key?.let { NotifListener.cancelKey(it) }
+                            IslandBus.notice.value = null
+                            IslandBus.notchPopAt = SystemClock.elapsedRealtime()
+                        }
+                    }
                     swipe.reset()
                 },
                 // Стопку листают вбок: остров остаётся на месте, меняется только уведомление
@@ -942,8 +953,15 @@ private fun onTap(context: Context, act: Act, expanded: Boolean, s: IslandSettin
     }
     when (act) {
         is Act.StackA -> {
-            // Слева — быстрые кнопки («быстрые плитки»), счётчик справа — достать уведомление из стопки
-            if (pos.x * 2f <= width) Controls.expand(act.id) else IslandBus.restoreFromStack()
+            // Плашка стопки — как обычное уведомление: нажатие открывает приложение,
+            // а само уведомление уходит из стопки
+            IslandBus.takeFromStack()?.let { n ->
+                n.message?.let { m ->
+                    if (!Controls.send(context, m.intent)) Controls.openApp(context, m.pkg)
+                }
+                n.openPkg?.let { Controls.openApp(context, it) }
+                n.alarm?.let { openAlarm(context, it) }
+            }
         }
         is Act.NoticeA -> {
             // Пока вводят ответ, нажатие по карточке не должно открывать приложение
