@@ -179,8 +179,18 @@ object PayMonitor {
         RegexOption.IGNORE_CASE,
     )
 
-    /** Цифры суммы — чтобы одна оплата с экрана и из уведомления не показалась дважды. */
-    private fun key(sum: String) = sum.filter { it.isDigit() }.trimEnd('0')
+    /**
+     * Сумма канонически: «1,00», «1.00» и «1 ₽» — одна и та же оплата, а «1», «10» и «100» —
+     * разные. Дробную часть ужимаем (1.50 = 1.5), целую не трогаем: нули в конце суммы значимы.
+     */
+    private fun key(sum: String): String {
+        val clean = sum.replace(',', '.').filter { it.isDigit() || it == '.' }
+        val dot = clean.indexOf('.')
+        val int = clean.take(if (dot < 0) clean.length else dot)
+            .filter { it.isDigit() }.trimStart('0').ifEmpty { "0" }
+        val frac = if (dot < 0) "" else clean.drop(dot + 1).filter { it.isDigit() }.trimEnd('0')
+        return if (frac.isEmpty()) int else "$int.$frac"
+    }
 
     /** Эта сумма уже показана как «Оплачено» за последние три минуты. */
     private fun alreadyShown(sum: String) = key(sum) == paidKey && SystemClock.elapsedRealtime() - paidAt < PAY_WINDOW_MS

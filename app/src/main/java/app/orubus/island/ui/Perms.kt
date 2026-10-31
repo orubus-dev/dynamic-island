@@ -29,6 +29,11 @@ object Perms {
         Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
             ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
 
+    /** Оповещения системы (Android 13+): «Остров остановился», звонок таймера без острова. */
+    fun postNotifications(context: Context): Boolean =
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+
     /** Звонки: состояние вызова обязательно, остальное — номер, имя и ответ кнопкой. */
     val CALL_PERMISSIONS = buildList {
         add(Manifest.permission.READ_PHONE_STATE)

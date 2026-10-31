@@ -277,23 +277,25 @@ class IslandService : AccessibilityService() {
         }
 
         scope.launch {
-            val gate: kotlinx.coroutines.flow.Flow<Pair<Boolean, Boolean>> = combine(
+            val gate: kotlinx.coroutines.flow.Flow<Triple<Boolean, Boolean, Boolean>> = combine(
                 IslandBus.locked,
                 IslandBus.keyguard,
                 IslandBus.gameForeground,
                 IslandBus.foregroundPackage,
-            ) { locked, keyguard, _, foreground -> (locked || keyguard) to (foreground == packageName) }
+            ) { locked, keyguard, game, foreground -> Triple(locked || keyguard, foreground == packageName, game) }
             combine(
                 SettingsRepo.state,
                 IslandBus.landscape,
                 IslandBus.offSchedule,
                 gate,
-            ) { s, land, _, gatePair ->
-                VisibilityInput(s, land, gatePair.first, gatePair.second)
+            ) { s, land, off, g ->
+                // Все меняющиеся значения обязаны дойти до VisibilityInput: если их выбросить,
+                // distinctUntilChanged проглотит пересечение границы расписания и вход в игру
+                VisibilityInput(s, land, g.first, g.second, off, g.third)
             }
                 .distinctUntilChanged()
                 .collect { input ->
-                    applySettings(input.s, input.landscape, input.locked, input.selfForeground)
+                    applySettings(input)
                 }
         }
 
@@ -431,18 +433,26 @@ class IslandService : AccessibilityService() {
         val landscape: Boolean,
         val locked: Boolean,
         val selfForeground: Boolean,
+        /** Вне часов «По расписанию» — остров спрятан, значение обязано прийти сюда (см. наблюдатель) */
+        val offSchedule: Boolean,
+        /** На переднем плане игра — для игрового режима */
+        val game: Boolean,
     )
 
-    private fun applySettings(s: IslandSettings, landscape: Boolean, lockedHide: Boolean, selfForeground: Boolean) {
+    private fun applySettings(input: VisibilityInput) {
+        val s = input.s
         val landscapeAllowed = if (s.showInLandscape) {
             // «Гибкий» — полный остров, «Фиксированный» — виден, но содержимое решает капсула
             true
         } else {
-            !landscape
+            !input.landscape
         }
-        val gameHide = IslandBus.gameForeground.value && !s.gameShowIsland
-        val hide = lockedHide || (s.hideWhileForeground && selfForeground) || gameHide
-        visible = s.enabled && landscapeAllowed && !hide && !IslandBus.offSchedule.value
+        val gameHide = input.game && !s.gameShowIsland
+        // «Скрывать на экране блокировки»: теперь честный выключатель — по умолчанию остров на
+        // замке остаётся (личные тексты и кнопки и так прячет IslandBus.locked)
+        val lockHide = input.locked && s.hideOnLockscreen
+        val hide = lockHide || (s.hideWhileForeground && input.selfForeground) || gameHide
+        visible = s.enabled && landscapeAllowed && !hide && !input.offSchedule
         display?.visibility = if (visible) View.VISIBLE else View.GONE
         // Остров спрятан — выключен, вне расписания или в повороте (скажем, смотрят видео): Compose в его окне
         // не рисует и не просыпается ради анимаций и эквалайзера, пока остров снова не покажется. С погашенным

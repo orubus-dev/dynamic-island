@@ -115,6 +115,8 @@ import app.orubus.island.data.IslandSettings
 import app.orubus.island.data.FaceStyle
 import app.orubus.island.data.SettingsRepo
 import app.orubus.island.service.Messages
+import app.orubus.island.service.NotifListener
+import app.orubus.island.core.Lang
 import androidx.compose.runtime.collectAsState
 import app.orubus.island.core.tr
 import app.orubus.island.ui.Inter
@@ -478,15 +480,15 @@ internal val StackInk = Color(0xFF1C1B22)
 
 /**
  * Стопка свернутых уведомлений: значок последнего уведомления и счётчик справа.
- * Смахивание вбок листает стопку — значок на миг превращается в карточку с именем отправителя,
- * и остров всё это время не гаснет. Нажатие слева открывает быстрые кнопки, нажатие по счётчику
- * достаёт уведомление целиком (обрабатывается в IslandOverlay, здесь только вид).
+ * Смахивание вбок листает стопку — значок разворачивается в полноразмерную плашку, как у обычного
+ * уведомления: имя приложения, «сколько уведомлений ждёт» и «Очистить всё». Остров всё это время
+ * живёт и не закрывается. Нажатие слева открывает быстрые кнопки, нажатие по счётчику достаёт
+ * уведомление целиком (обрабатывается в IslandOverlay, здесь только вид).
  */
 @Composable
 private fun StackCard(items: List<Notice>, s: IslandSettings) {
     val h = activeHeight(s)
     val browseIdx by IslandBus.stackBrowse.collectAsState()
-    val locked by IslandBus.locked.collectAsState()
     val browsing = browseIdx in items.indices
     // Просмотренное уведомление само возвращается в значок со счётчиком
     LaunchedEffect(browseIdx) {
@@ -520,32 +522,99 @@ private fun StackCard(items: List<Notice>, s: IslandSettings) {
                 StackBadge(items.size, badgeSize)
             }
         } else {
-            // Листают: карточка с отправителем, счётчик остаётся справа
-            Row(
-                Modifier
-                    .width((h * 6f).coerceAtMost(messageWidth()))
-                    .height(h)
-                    .padding(horizontal = h * 0.3f),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                StackIcon(shown, h * 0.6f, pop.value)
-                Spacer(Modifier.width(h * 0.26f))
-                val hidden = locked && shown.message?.sensitive == true
-                FitText(
-                    when {
-                        hidden -> shown.message?.appName ?: shown.title
-                        shown.title.isNotBlank() -> shown.title
-                        else -> shown.message?.appName ?: ""
-                    },
-                    Color(s.textColor),
-                    15.sp, 11.sp, FontWeight.SemiBold,
-                    Modifier.weight(1f),
-                    style = TextStyle(fontFamily = s.fontFamily.family()),
-                )
-                Spacer(Modifier.width(h * 0.26f))
-                StackBadge(items.size, badgeSize)
+            // Листают: полная плашка размера обычного уведомления, счётчик заменяет текст «сколько ждёт»
+            StackBrowseCard(shown, items, s, pop.value)
+        }
+    }
+}
+
+/**
+ * Просмотр стопки — полноразмерная плашка, ровно как у обычного уведомления (не уменьшенная):
+ * шапка с приложением на уровне камеры, значок, заголовок, «N новых уведомлений ждут вас»
+ * и кнопка «Очистить всё», как на системных плашках.
+ */
+@Composable
+private fun StackBrowseCard(shown: Notice, items: List<Notice>, s: IslandSettings, pop: Float) {
+    val haptic = rememberHaptic()
+    val locked by IslandBus.locked.collectAsState()
+    val app = shown.message?.appName?.takeIf { it.isNotBlank() } ?: shown.title
+    val headerIcon = shown.message?.appIcon
+    val hidden = locked && shown.message?.sensitive == true
+    val n = items.size
+    val waiting = when {
+        Lang.en -> if (n == 1) "1 new notification waiting for you" else "$n new notifications waiting for you"
+        n % 10 == 1 && n % 100 != 11 -> "$n новое уведомление ждёт вас"
+        n % 10 in 2..4 && n % 100 !in 12..14 -> "$n новых уведомления ждут вас"
+        else -> "$n новых уведомлений ждут вас"
+    }
+    Column(
+        Modifier
+            .width(messageWidth())
+            .padding(bottom = 12.dp),
+    ) {
+        // Шапка на уровне камеры: слева приложение, справа время — как боковые части острова iPhone
+        Row(
+            Modifier.fillMaxWidth().height(s.height.dp).padding(horizontal = 18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                if (headerIcon != null) {
+                    Image(headerIcon, null, Modifier.size(15.dp).clip(RoundedCornerShape(4.dp)))
+                    Spacer(Modifier.width(6.dp))
+                }
+                Text(app, color = Color.White.copy(alpha = 0.55f), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Spacer(Modifier.width(compactGap(s)))
+            Row(Modifier.weight(1f), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                Text(tr("сейчас", "now"), color = Color.White.copy(alpha = 0.55f), fontSize = 12.sp, maxLines = 1, softWrap = false)
+                Spacer(Modifier.width(4.dp))
+                Icon(Ios.bell, null, tint = Color.White.copy(alpha = 0.55f), modifier = Modifier.size(12.dp))
             }
         }
+        Spacer(Modifier.height((messageTop(s) - s.height.dp).coerceAtLeast(4.dp)))
+        Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+            StackIcon(shown, 40.dp, pop)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    if (hidden) app else shown.title.ifBlank { app },
+                    color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    waiting, color = Color.White.copy(alpha = 0.88f), fontSize = 14.sp,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Spacer(Modifier.width(10.dp))
+            StackClearChip {
+                haptic()
+                // «Очистить всё»: убрать и из значка, и из шторки (если включено «Смахнул — значит убрать»)
+                if (s.swipeClearNotif) items.forEach { it.message?.key?.let(NotifListener::cancelKey) }
+                IslandBus.stackBrowse.value = -1
+                IslandBus.noticeStack.value = emptyList()
+            }
+        }
+    }
+}
+
+/** Кнопка «Очистить всё» на плашке просмотра стопки — в тонкой рамке, как на системных плашках. */
+@Composable
+private fun StackClearChip(onClick: () -> Unit) {
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(50))
+            .border(1.dp, Color.White.copy(alpha = 0.4f), RoundedCornerShape(50))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 7.dp),
+    ) {
+        Text(
+            tr("Очистить всё", "Clear all").uppercase(),
+            color = Color.White.copy(alpha = 0.85f),
+            fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
+            style = TextStyle(letterSpacing = 0.6.sp),
+            maxLines = 1, softWrap = false,
+        )
     }
 }
 

@@ -58,6 +58,7 @@ import androidx.compose.material.icons.rounded.WifiTethering
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -121,7 +122,13 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /** Какие разрешения есть. Проверяются заново каждый раз, когда возвращаемся из системных настроек. */
-private class PermState(val accessibility: Boolean, val notifications: Boolean, val calls: Boolean, val bluetooth: Boolean) {
+private class PermState(
+    val accessibility: Boolean,
+    val notifications: Boolean,
+    val calls: Boolean,
+    val bluetooth: Boolean,
+    val alerts: Boolean,
+) {
     /** Чего не хватает — для подписи на главной */
     val missing: List<String>
         get() = listOfNotNull(
@@ -151,7 +158,13 @@ internal fun <T> rememberOnResume(read: () -> T): Pair<T, () -> Unit> {
 private fun rememberPermState(): Pair<PermState, () -> Unit> {
     val context = LocalContext.current
     return rememberOnResume {
-        PermState(Perms.accessibility(context), Perms.notifications(context), Perms.calls(context), Perms.bluetooth(context))
+        PermState(
+            Perms.accessibility(context),
+            Perms.notifications(context),
+            Perms.calls(context),
+            Perms.bluetooth(context),
+            Perms.postNotifications(context),
+        )
     }
 }
 
@@ -166,6 +179,16 @@ fun HomeScreen(open: (Screen) -> Unit) {
     val running by IslandBus.serviceRunning.collectAsState()
     val (perms, _) = rememberPermState()
     val missing = perms.missing
+
+    // «Остров остановился» и звонок таймера без острова приходят оповещением: на Android 13+
+    // просим право на оповещения один раз, при первом открытии приложения
+    val alertsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    LaunchedEffect(Unit) {
+        if (!Perms.postNotifications(context)) {
+            delay(1_500)
+            alertsLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
 
     Page(tr("Динамический остров", "Dynamic Island")) {
         IslandPreview()
@@ -331,6 +354,7 @@ fun PermissionsScreen(onBack: () -> Unit, open: (Screen) -> Unit) {
     val context = LocalContext.current
     val (perms, refresh) = rememberPermState()
     val btLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { refresh() }
+    val alertsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { refresh() }
     val callLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
         refresh()
         // Если система больше не показывает запрос — открываем настройки приложения
@@ -353,6 +377,17 @@ fun PermissionsScreen(onBack: () -> Unit, open: (Screen) -> Unit) {
                 else tr("Нужен для музыки, сообщений, прогресса и таймеров", "Needed for music, messages, progress and timers"),
                 onClick = { Perms.openNotifications(context) }, color = Tile.Red,
             ) { Status(perms.notifications) }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                GroupItem(
+                    Pos.Middle, Icons.Rounded.Campaign, tr("Оповещения", "Alerts"),
+                    if (perms.alerts) tr("Включено — «Остров остановился» и звонок таймера без острова", "On — “The island stopped” and the timer ring without the island")
+                    else tr("Чтобы увидеть, когда остров остановился", "So you see when the island stopped"),
+                    onClick = {
+                        if (perms.alerts) Perms.openAppDetails(context) else alertsLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    },
+                    color = Tile.Orange,
+                ) { Status(perms.alerts) }
+            }
             GroupItem(
                 Pos.Middle, Icons.Rounded.Call, tr("Звонки", "Calls"),
                 if (perms.calls) tr("Входящий вызов, имя из контактов, ответ кнопкой", "Incoming calls, names from contacts, answer button")

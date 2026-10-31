@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -31,6 +32,15 @@
     <!-- «Не выгружать остров»: служба на переднем плане, чтобы остров не закрывался вместе с недавними -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+
+    <!-- Самолечение и экранный щит: право выдаётся один раз через adb
+         (pm grant работает только для заявленного в манифесте разрешения) -->
+    <uses-permission
+        android:name="android.permission.WRITE_SECURE_SETTINGS"
+        tools:ignore="ProtectedPermissions" />
+
+    <!-- Плашка «Остров остановился» и звонок таймера без острова: на Android 13+ нужно разрешение -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- Обновление из приложения: скачанный APK открывает системная установка -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
@@ -168,6 +178,16 @@
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
         </service>
+
+        <!-- Звонок таймера, даже если процесс острова умер к этому моменту:
+             будильник приходит сюда напрямую, таймер восстанавливается из хранилища -->
+        <receiver
+            android:name=".service.TimerWakeReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="app.orubus.island.TIMER_WAKE" />
+            </intent-filter>
+        </receiver>
 
         <!-- Движок острова: будит службы после сбоя приложения, перезагрузки телефона или обновления.
              Рассылки системные и защищённые: послать их может только система -->

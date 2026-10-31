@@ -49,6 +49,12 @@ object PrivacyMonitor {
     private val main = Handler(Looper.getMainLooper())
     private var tetherManager: Any? = null
     private var tetherProxy: Any? = null
+    // Колбэки держим под руками: stop() обязан их снять, иначе после перезапуска службы
+    // слушатели копятся и продолжают звонить после остановки слежения
+    private var audioCb: AudioManager.AudioRecordingCallback? = null
+    private var torchCb: CameraManager.TorchCallback? = null
+    private var camCb: CameraManager.AvailabilityCallback? = null
+    private var appOpsProxy: Any? = null
 
     // Кто именно пишет звук / держит камеру — из AppOps (короткие коды стабильны годами)
     private const val OP_RECORD_AUDIO = 27
@@ -67,7 +73,7 @@ object PrivacyMonitor {
         appContext = app
 
         val audio = app.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        audio.registerAudioRecordingCallback(object : AudioManager.AudioRecordingCallback() {
+        audioCb = object : AudioManager.AudioRecordingCallback() {
             override fun onRecordingConfigChanged(configs: MutableList<AudioRecordingConfiguration>) {
                 val active = configs.isNotEmpty()
                 if (active != mic) {
@@ -76,12 +82,12 @@ object PrivacyMonitor {
                     if (active) announce()
                 }
             }
-        }, null)
+        }.also { audio.registerAudioRecordingCallback(it, null) }
 
         val camera = app.getSystemService(Context.CAMERA_SERVICE) as CameraManager
         // Фонарик тоже открывает камеру. Следим за вспышкой отдельно: пока она горит (даже у чужого
         // приложения), «камеру в использовании» не объявляем — иначе фонарик выдавал себя за камеру
-        camera.registerTorchCallback(object : CameraManager.TorchCallback() {
+        torchCb = object : CameraManager.TorchCallback() {
             override fun onTorchModeChanged(cameraId: String, enabled: Boolean) {
                 torchOn = enabled
                 if (enabled && cam && camPkg == null) {
@@ -89,8 +95,8 @@ object PrivacyMonitor {
                     IslandBus.camActive.value = false
                 }
             }
-        }, null)
-        camera.registerAvailabilityCallback(object : CameraManager.AvailabilityCallback() {
+        }.also { camera.registerTorchCallback(it, null) }
+        camCb = object : CameraManager.AvailabilityCallback() {
             override fun onCameraAvailable(cameraId: String) {
                 if (isMainCamera(app, cameraId)) {
                     cam = false
@@ -109,7 +115,7 @@ object PrivacyMonitor {
                     announce()
                 }, 250)
             }
-        }, null)
+        }.also { camera.registerAvailabilityCallback(it, null) }
 
         watchAppOps(app)
 
@@ -136,6 +142,25 @@ object PrivacyMonitor {
         started = false
         pollJob?.cancel()
         pollJob = null
+        val app = appContext
+        runCatching {
+            val audio = app?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+            audioCb?.let { cb -> audio?.unregisterAudioRecordingCallback(cb) }
+        }
+        runCatching {
+            val camera = app?.getSystemService(Context.CAMERA_SERVICE) as? CameraManager
+            torchCb?.let { cb -> camera?.unregisterTorchCallback(cb) }
+            camCb?.let { cb -> camera?.unregisterAvailabilityCallback(cb) }
+        }
+        audioCb = null
+        torchCb = null
+        camCb = null
+        runCatching {
+            val proxy = appOpsProxy ?: return@runCatching
+            app?.getSystemService(AppOpsManager::class.java)?.javaClass?.methods
+                ?.firstOrNull { it.name == "stopWatchingActive" }?.invoke(app.getSystemService(AppOpsManager::class.java), proxy)
+        }
+        appOpsProxy = null
         runCatching {
             val tm = tetherManager
             val proxy = tetherProxy
@@ -146,6 +171,11 @@ object PrivacyMonitor {
         tetherProxy = null
         tetherManager = null
         main.removeCallbacksAndMessages(null)
+        mic = false
+        cam = false
+        torchOn = false
+        micPkg = null
+        camPkg = null
         IslandBus.micActive.value = false
         IslandBus.camActive.value = false
         IslandBus.hotspotOn.value = false
@@ -191,6 +221,7 @@ object PrivacyMonitor {
                 m2 != null -> m2.invoke(ops, array, proxy)
                 else -> return
             }
+            appOpsProxy = proxy
         }
     }
 
@@ -287,7 +318,8 @@ object PrivacyMonitor {
             camera -> IslandBus.post(
                 Notice(
                     title,
-                    tr("используется приложением", "in use by an app"),
+                    // Коротко, чтобы пилюля не обрезала: «используется», а не «используется приложением»
+                    tr("используется", "in use"),
                     Icons.Rounded.Videocam,
                     Tints.Green,
                     style = NoticeStyle.CAM,
@@ -300,7 +332,7 @@ object PrivacyMonitor {
             else -> IslandBus.post(
                 Notice(
                     title,
-                    tr("используется приложением", "in use by an app"),
+                    tr("используется", "in use"),
                     Icons.Rounded.Mic,
                     Tints.Orange,
                     style = NoticeStyle.PILL,

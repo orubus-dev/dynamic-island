@@ -211,7 +211,10 @@ object AdbShield {
             val arg0 = buf.int
             val arg1 = buf.int
             val len = buf.int
-            buf.position(16) // crc пропускаем, magic проверяем — повреждённый поток дальше не читаем
+            // Пакет ADB: cmd, arg0, arg1, длина — по 4 байта, затем crc32 на 16-м и magic на 20-м.
+            // Смещение 20: после четырёх int курсор уже на crc — перескочим и crc, иначе «broken frame»
+            // на каждом ответе adbd
+            buf.position(20)
             val magic = buf.int
             if (magic != cmd.inv()) throw AdbException("broken frame")
             val data = if (len > 0) {

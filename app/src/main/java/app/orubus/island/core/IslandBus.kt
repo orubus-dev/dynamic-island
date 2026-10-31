@@ -119,11 +119,13 @@ object IslandBus {
 
     /**
      * Гаситель двойных плашек, два окна:
-     *  • [DEDUP_MS] — одна и та же плашка (заголовок + текст + стиль) не показывается второй раз,
-     *    пока не прошло 4,5 секунды; мессенджеры любят перезаливать уведомление (прочитано,
-     *    реакции, дубли под другим ключом) — без гасителя остров мигал бы дважды;
-     *  • [BURST_MS] — мгновенное подавление в те же миллисекунды: повтор с тем же заголовком
-     *    и стилем, пришедший быстрее 900 мс (даже с изменившимся текстом), гасится сразу.
+     *  • [DEDUP_MS] — одна и та же плашка (приложение + заголовок + текст + стиль) не показывается
+     *    второй раз, пока не прошло 4,5 секунды; мессенджеры любят перезаливать уведомление
+     *    (прочитано, реакции, дубли под другим ключом) — без гасителя остров мигал бы дважды;
+     *  • [BURST_MS] — мгновенное подавление в те же миллисекунды: повтор того же уведомления
+     *    (по его системному ключу) или та же пара «заголовок + стиль» без текста, пришедшие
+     *    быстрее 900 мс, гасятся сразу даже с изменившимся текстом. Другое уведомление того же
+     *    отправителя (другой ключ, другой текст) проходит — это живое сообщение, а не дубль.
      */
     private val recent = object : LinkedHashMap<String, Long>(32, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Long>?) = size > 40
@@ -143,25 +145,31 @@ object IslandBus {
 
     private fun signature(n: Notice): String {
         val text = n.message?.text ?: n.state
-        return "${n.title}\u0000$text\u0000${n.style}"
+        // Приложение-источник обязательно: без него чужие острова гасят друг друга
+        return "${n.message?.pkg.orEmpty()}\u0000${n.title}\u0000$text\u0000${n.style}"
     }
+
+    private fun burstKey(n: Notice): String =
+        // У сообщений ключ уведомления: повтор того же уведомления гасим, новое — пропускаем
+        "${n.message?.pkg.orEmpty()}\u0000${n.title}\u0000${n.style}\u0000${n.message?.key.orEmpty()}"
 
     fun post(n: Notice) {
         // Тихие часы: остров молчит — плашки не показываются (уведомления остаются в шторке)
         val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
         if (SettingsRepo.current.inQuietHours(hour)) return
         val sig = signature(n)
+        val burst = burstKey(n)
         val now = android.os.SystemClock.elapsedRealtime()
         synchronized(recent) {
             val last = recent[sig]
-            val burst = coarse["${n.title}\u0000${n.style}"]
-            if (last != null && now - last < DEDUP_MS || burst != null && now - burst < BURST_MS) {
+            val coarseHit = coarse[burst]
+            if (last != null && now - last < DEDUP_MS || coarseHit != null && now - coarseHit < BURST_MS) {
                 deduped++
                 reportShield()
                 return
             }
             recent[sig] = now
-            coarse["${n.title}\u0000${n.style}"] = now
+            coarse[burst] = now
             if (coarse.size > 40) coarse.remove(coarse.keys.first())
         }
         queue.trySend(n)
