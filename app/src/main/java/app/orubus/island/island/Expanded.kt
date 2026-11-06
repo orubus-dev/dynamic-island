@@ -52,9 +52,12 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.BluetoothAudio
@@ -98,6 +101,7 @@ import app.orubus.island.core.LiveInfo
 import app.orubus.island.core.Lyrics
 import app.orubus.island.core.LyricsStatus
 import app.orubus.island.core.MediaInfo
+import app.orubus.island.core.Notice
 import app.orubus.island.core.PlayerAction
 import app.orubus.island.core.ProgressInfo
 import app.orubus.island.core.StopwatchState
@@ -108,6 +112,7 @@ import app.orubus.island.core.formatDuration
 import app.orubus.island.core.tr
 import app.orubus.island.data.IslandSettings
 import app.orubus.island.data.QuickAction
+import app.orubus.island.service.NotifListener
 import app.orubus.island.data.SettingsRepo
 import app.orubus.island.service.ClockApps
 import app.orubus.island.service.ClockControl
@@ -116,6 +121,103 @@ import java.text.SimpleDateFormat
 import java.util.Date
 
 private val Dim = Color.White.copy(alpha = 0.55f)
+
+/**
+ * Весь список уведомлений стопки — то, что открывается тапом по правой половине капсулы:
+ * от нового к старому, у каждого значок приложения, отправитель, текст и время. Тап по строке
+ * открывает приложение и убирает уведомление из стопки, «Очистить всё» убирает все сразу.
+ */
+@Composable
+private fun StackExpanded(items: List<Notice>, s: IslandSettings) {
+    val context = LocalContext.current
+    val haptic = rememberHaptic()
+    val locked by IslandBus.locked.collectAsState()
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                tr("Уведомления", "Notifications"),
+                color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f),
+            )
+            if (items.isNotEmpty()) {
+                Text(
+                    tr("Очистить всё", "Clear all"),
+                    color = Tints.Red, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.clickable {
+                        haptic()
+                        if (s.swipeClearNotif) items.forEach { it.message?.key?.let(NotifListener::cancelKey) }
+                        IslandBus.stackBrowse.value = -1
+                        IslandBus.noticeStack.value = emptyList()
+                    },
+                )
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        if (items.isEmpty()) {
+            Text(tr("Новых уведомлений нет", "No notifications"), color = Dim, fontSize = 14.sp)
+        } else {
+            // Список выше окна острова не вырастает: видно около шести уведомлений, дальше — прокрутка
+            Column(
+                Modifier
+                    .heightIn(max = 312.dp)
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                items.asReversed().forEach { n ->
+                    StackRow(n, locked) {
+                        haptic()
+                        n.message?.let { m ->
+                            if (!Controls.send(context, m.intent)) Controls.openApp(context, m.pkg)
+                        }
+                        n.openPkg?.let { Controls.openApp(context, it) }
+                        IslandBus.removeFromStack(n)
+                        Controls.collapse()
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Строка уведомления в списке стопки. */
+@Composable
+private fun StackRow(n: Notice, locked: Boolean, onOpen: () -> Unit) {
+    val hidden = locked && n.message?.sensitive == true
+    val app = n.message?.appName?.takeIf { it.isNotBlank() } ?: n.title
+    val text = n.message?.text?.takeIf { it.isNotBlank() } ?: n.state
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .clickable(onClick = onOpen)
+            .padding(horizontal = 4.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (hidden) {
+            Icon(Ios.lock, null, tint = Dim, modifier = Modifier.size(30.dp))
+        } else {
+            StackIcon(n, 34.dp, 1f)
+        }
+        Spacer(Modifier.width(11.dp))
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    if (hidden) app else n.title.ifBlank { app },
+                    color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(app, color = Dim, fontSize = 12.sp, maxLines = 1, softWrap = false)
+            }
+            if (!hidden && !text.isNullOrBlank()) {
+                Text(
+                    text, color = Color.White.copy(alpha = 0.82f), fontSize = 14.sp, lineHeight = 18.sp,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
 
 @Composable
 fun ExpandedContent(act: Act, s: IslandSettings, lyrics: Lyrics?, battery: BatteryInfo, width: Dp) {
@@ -137,6 +239,7 @@ fun ExpandedContent(act: Act, s: IslandSettings, lyrics: Lyrics?, battery: Batte
             is Act.LiveA -> LiveExpanded(act.l)
             is Act.CallA -> CallExpanded(act.c)
             is Act.AlarmA -> AlarmExpanded(act.a, s)
+            is Act.StackA -> StackExpanded(act.items, s)
             else -> IdleExpanded(s, battery)
         }
     }

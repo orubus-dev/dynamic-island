@@ -522,7 +522,8 @@ private fun IslandBody(
         expanded && primary is Act.LiveA -> bigR
         expanded -> bigR
         primary is Act.NoticeA && (primary.n.style == NoticeStyle.MESSAGE || primary.n.style == NoticeStyle.EGG) -> bigR.coerceAtMost(34.dp)
-        primary is Act.StackA -> bigR.coerceAtMost(34.dp)
+        // Капсула стопки — малый радиус, как у капсулы с активностью; раскрытая ловится веткой «expanded» выше
+        primary is Act.StackA -> smallR.coerceAtMost(activeHeight(s) / 2)
         primary is Act.NoticeA && primary.n.style == NoticeStyle.UPDATE -> bigR.coerceAtMost(38.dp)
         primary is Act.NoticeA && primary.n.style == NoticeStyle.WIDE && primary.n.title.isNotBlank() ->
             minOf(bigR, noticeHeight(s) / 2)
@@ -726,7 +727,9 @@ private fun IslandBody(
                     SwipeCaps(
                         canExpand = !isExpanded && settings.swipeExpand && !act.transient && (act !is Act.Idle || settings.idleExpand),
                         canCollapse = isExpanded,
-                        canDismiss = !isExpanded && (act is Act.NoticeA || act is Act.PayA || act is Act.StackA || (act is Act.CallA && act.c.incoming)),
+                        // Стопку свайпом вбок не смахиваем — она листается (canBrowse); вверх/вниз — пружиной назад.
+                        // Из-за свайпа по стопке остров больше не исчезает
+                        canDismiss = !isExpanded && (act is Act.NoticeA || act is Act.PayA || (act is Act.CallA && act.c.incoming)),
                         canTracks = !isExpanded && act is Act.MediaA && settings.swipeTracks,
                         canMinimize = !isExpanded && act is Act.NoticeA,
                         canBrowse = !isExpanded && act is Act.StackA,
@@ -745,18 +748,14 @@ private fun IslandBody(
                 onDismiss = {
                     val act = current
                     when (act) {
-                        // Со «Смахнул — значит убрать» уведомление уходит и из шторки
+                        // Со «Смахнул — значит убрать» уведомление уходит и из шторки, и из стопки
                         is Act.NoticeA -> {
-                            if (settings.swipeClearNotif) act.n.message?.key?.let { NotifListener.cancelKey(it) }
+                            if (settings.swipeClearNotif) act.n.message?.key?.let {
+                                NotifListener.cancelKey(it)
+                                IslandBus.dropStackKey(it)
+                            }
                             IslandBus.notice.value = null
                             // Пустому острову после смахнутой плашки — выход из-под камеры
-                            IslandBus.notchPopAt = SystemClock.elapsedRealtime()
-                        }
-                        // Стопку смахнули вбок далеко — очистить целиком: и значок, и уведомления в шторке, если включено
-                        is Act.StackA -> {
-                            if (settings.swipeClearNotif) act.items.forEach { it.message?.key?.let(NotifListener::cancelKey) }
-                            IslandBus.stackBrowse.value = -1
-                            IslandBus.noticeStack.value = emptyList()
                             IslandBus.notchPopAt = SystemClock.elapsedRealtime()
                         }
                         // Подсказку оплаты тоже можно смахнуть
@@ -774,7 +773,7 @@ private fun IslandBody(
                     }
                     swipe.reset()
                 },
-                // Плашку смахнули вверх — она не исчезает, а остаётся у выреза полноразмерной плашкой.
+                // Плашку смахнули вверх — она не исчезает, а остаётся у выреза значком со счётчиком.
                 // Выключатель «Свёрнутые уведомления» возвращает прежнее поведение: плашка просто смахивается
                 onMinimize = {
                     val act = current
@@ -953,14 +952,18 @@ private fun onTap(context: Context, act: Act, expanded: Boolean, s: IslandSettin
     }
     when (act) {
         is Act.StackA -> {
-            // Плашка стопки — как обычное уведомление: нажатие открывает приложение,
-            // а само уведомление уходит из стопки
-            IslandBus.takeFromStack()?.let { n ->
-                n.message?.let { m ->
-                    if (!Controls.send(context, m.intent)) Controls.openApp(context, m.pkg)
+            // Тап по правой половине — весь список уведомлений стопки; по значку слева — приложение,
+            // и уведомление уходит из стопки (прочитано)
+            if (pos.x >= width / 2f) {
+                Controls.expand(act.id)
+            } else {
+                IslandBus.takeFromStack()?.let { n ->
+                    n.message?.let { m ->
+                        if (!Controls.send(context, m.intent)) Controls.openApp(context, m.pkg)
+                    }
+                    n.openPkg?.let { Controls.openApp(context, it) }
+                    n.alarm?.let { openAlarm(context, it) }
                 }
-                n.openPkg?.let { Controls.openApp(context, it) }
-                n.alarm?.let { openAlarm(context, it) }
             }
         }
         is Act.NoticeA -> {
@@ -973,6 +976,8 @@ private fun onTap(context: Context, act: Act, expanded: Boolean, s: IslandSettin
             act.n.openPkg?.let { Controls.openApp(context, it) }
             act.n.alarm?.let { openAlarm(context, it) }
             IslandBus.notice.value = null
+            // Открыли приложение — уведомление прочитано: из авто-стопки оно тоже уходит
+            act.n.message?.key?.let { IslandBus.dropStackKey(it) }
         }
         // Пустой остров раскрывается, если это не выключили в «Поведении»
         is Act.Idle -> if (s.idleExpand) Controls.expand(act.id)

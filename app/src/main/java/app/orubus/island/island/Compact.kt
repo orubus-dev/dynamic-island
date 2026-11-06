@@ -22,6 +22,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.border
@@ -115,8 +117,6 @@ import app.orubus.island.data.IslandSettings
 import app.orubus.island.data.FaceStyle
 import app.orubus.island.data.SettingsRepo
 import app.orubus.island.service.Messages
-import app.orubus.island.service.NotifListener
-import app.orubus.island.core.Lang
 import androidx.compose.runtime.collectAsState
 import app.orubus.island.core.tr
 import app.orubus.island.ui.Inter
@@ -479,137 +479,72 @@ private fun NoticeCompact(n: Notice, s: IslandSettings, wideWidth: Dp) {
 internal val StackInk = Color(0xFF1C1B22)
 
 /**
- * Стопка свернутых уведомлений — полноразмерная плашка, ровно того же размера, что у обычного
- * уведомления: та же ширина, шапка с приложением у камеры, значок 40 dp, заголовок и текст
- * сообщения. Никаких уменьшенных значков: смахнутая плашка ждёт у выреза полноценной карточкой.
- * Свайп вбок листает стопку, свайп вверх очищает её, нажатие открывает приложение
- * (обрабатывается в IslandOverlay, здесь только вид).
+ * Стопка свернутых уведомлений — капсула со значком приложения последнего уведомления слева и
+ * красным бейджем с числом всех уведомлений справа, как бейдж на значке приложения iPhone.
+ * Свайп вбок листает стопку (кадр выезжает в ту сторону, куда листнули), нажатие справа открывает
+ * весь список, по значку — приложение (обрабатывается в IslandOverlay, здесь только вид).
  */
 @Composable
 private fun StackCard(items: List<Notice>, s: IslandSettings) {
+    val h = activeHeight(s)
     val browseIdx by IslandBus.stackBrowse.collectAsState()
-    val shown = items.getOrNull(browseIdx.takeIf { it in items.indices } ?: items.lastIndex) ?: return
-    val pop = remember(items.size, browseIdx) { Animatable(if (s.reduceEffects) 1f else 0.55f) }
-    LaunchedEffect(items.size, browseIdx) { pop.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = 340f)) }
-    StackBrowseCard(shown, items, s, pop.value)
-}
-
-/**
- * Плашка стопки — полноразмерная, ровно как у обычного уведомления (не уменьшенная): та же ширина,
- * шапка с приложением на уровне камеры, значок 40 dp, заголовок и текст сообщения, как у системных
- * плашек. Внизу — сколько уведомлений ждёт (когда их больше одного) и кнопка «Очистить всё».
- */
-@Composable
-private fun StackBrowseCard(shown: Notice, items: List<Notice>, s: IslandSettings, pop: Float) {
-    val haptic = rememberHaptic()
+    val dir by IslandBus.stackDir.collectAsState()
     val locked by IslandBus.locked.collectAsState()
-    val app = shown.message?.appName?.takeIf { it.isNotBlank() } ?: shown.title
-    val headerIcon = shown.message?.appIcon
-    val hidden = locked && shown.message?.sensitive == true
-    val n = items.size
-    val waiting = when {
-        Lang.en -> if (n == 1) "1 new notification waiting for you" else "$n new notifications waiting for you"
-        n % 10 == 1 && n % 100 != 11 -> "$n новое уведомление ждёт вас"
-        n % 10 in 2..4 && n % 100 !in 12..14 -> "$n новых уведомления ждут вас"
-        else -> "$n новых уведомлений ждут вас"
-    }
-    // Текст самой плашки: у сообщений — текст сообщения, у событий — их подпись
-    val text = shown.message?.text?.takeIf { it.isNotBlank() } ?: shown.state?.takeIf { it.isNotBlank() }
-    Column(
-        Modifier
-            .width(messageWidth())
-            .padding(bottom = 12.dp),
-    ) {
-        // Шапка на уровне камеры: слева приложение, справа время — как боковые части острова iPhone
-        Row(
-            Modifier.fillMaxWidth().height(s.height.dp).padding(horizontal = 18.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                if (headerIcon != null) {
-                    Image(headerIcon, null, Modifier.size(15.dp).clip(RoundedCornerShape(4.dp)))
-                    Spacer(Modifier.width(6.dp))
+    val idx = browseIdx.takeIf { it in items.indices } ?: items.lastIndex
+    val shown = items.getOrNull(idx) ?: return
+    AnimatedContent(
+        targetState = shown.id,
+        contentKey = { it },
+        transitionSpec = {
+            val forward = dir >= 0
+            (slideInHorizontally(tween(180)) { w -> if (forward) w / 2 else -w / 2 } + fadeIn(tween(150))) togetherWith
+                (slideOutHorizontally(tween(150)) { w -> if (forward) -w / 2 else w / 2 } + fadeOut(tween(120)))
+        },
+        label = "stack",
+    ) { id ->
+        // Кадр анимации отвечает за СВОЙ ключ: уходящий кадр показывает прежнее уведомление
+        val entry = items.firstOrNull { it.id == id } ?: shown
+        // На заблокированном экране — как в шторке: не выдаем, ОТ кого уведомление, даже значком
+        val secret = locked && entry.message?.sensitive == true
+        CompactRow(h, compactGap(s), h * 2.4f,
+            left = {
+                if (secret) {
+                    Icon(Ios.lock, null, tint = Color.White, modifier = Modifier.size(h * 0.5f))
+                } else {
+                    StackIcon(entry, h * 0.58f, 1f)
                 }
-                Text(app, color = Color.White.copy(alpha = 0.55f), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-            Spacer(Modifier.width(compactGap(s)))
-            Row(Modifier.weight(1f), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
-                Text(tr("сейчас", "now"), color = Color.White.copy(alpha = 0.55f), fontSize = 12.sp, maxLines = 1, softWrap = false)
-                Spacer(Modifier.width(4.dp))
-                Icon(Ios.bell, null, tint = Color.White.copy(alpha = 0.55f), modifier = Modifier.size(12.dp))
-            }
-        }
-        Spacer(Modifier.height((messageTop(s) - s.height.dp).coerceAtLeast(4.dp)))
-        Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.Top) {
-            StackIcon(shown, 40.dp, pop)
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    if (hidden) app else shown.title.ifBlank { app },
-                    color = Color.White, fontSize = 15.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis,
-                )
-                when {
-                    hidden -> Text(
-                        tr("Содержимое скрыто", "Content hidden"),
-                        color = Color.White.copy(alpha = 0.55f), fontSize = 14.sp, lineHeight = 19.sp, maxLines = 1,
-                    )
-                    text != null -> Text(
-                        text, color = Color.White.copy(alpha = 0.88f), fontSize = 14.sp, lineHeight = 19.sp,
-                        maxLines = s.msgLines.coerceIn(1, 8), overflow = TextOverflow.Ellipsis,
-                    )
-                    else -> Text(
-                        waiting, color = Color.White.copy(alpha = 0.88f), fontSize = 14.sp, lineHeight = 19.sp,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-        }
-        Spacer(Modifier.height(8.dp))
-        Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (n > 1) {
-                Text(
-                    waiting, color = Color.White.copy(alpha = 0.55f), fontSize = 12.sp,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
-                )
-                Spacer(Modifier.width(10.dp))
-            } else {
-                Spacer(Modifier.weight(1f))
-            }
-            StackClearChip {
-                haptic()
-                // «Очистить всё»: убрать и из стопки, и из шторки (если включено «Смахнул — значит убрать»)
-                if (s.swipeClearNotif) items.forEach { it.message?.key?.let(NotifListener::cancelKey) }
-                IslandBus.stackBrowse.value = -1
-                IslandBus.noticeStack.value = emptyList()
-            }
-        }
+            },
+            right = { StackCountBadge(items.size, h) },
+            shrink = false,
+        )
     }
 }
 
-/** Кнопка «Очистить всё» на плашке просмотра стопки — в тонкой рамке, как на системных плашках. */
+/** Красный бейдж-счётчик уведомлений стопки: «3», а от десяти — «9+». */
 @Composable
-private fun StackClearChip(onClick: () -> Unit) {
+private fun StackCountBadge(count: Int, h: Dp) {
+    val size = (h * 0.52f).coerceAtLeast(18.dp)
     Box(
         Modifier
-            .clip(RoundedCornerShape(50))
-            .border(1.dp, Color.White.copy(alpha = 0.4f), RoundedCornerShape(50))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 7.dp),
+            .size(size)
+            .border(1.5.dp, Color.Black.copy(alpha = 0.55f), CircleShape)
+            .clip(CircleShape).background(Tints.Red),
+        contentAlignment = Alignment.Center,
     ) {
         Text(
-            tr("Очистить всё", "Clear all").uppercase(),
-            color = Color.White.copy(alpha = 0.85f),
-            fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
-            style = TextStyle(letterSpacing = 0.6.sp),
+            if (count > 9) "9+" else "$count",
+            color = Color.White,
+            fontSize = if (count > 9) 10.sp else 12.sp,
+            fontWeight = FontWeight.Bold,
             maxLines = 1, softWrap = false,
+            style = Digits.copy(fontWeight = FontWeight.Bold),
         )
     }
 }
 
 /** Значок уведомления в стопке: значок приложения, а без него — значок события. */
 @Composable
-private fun StackIcon(n: Notice, size: Dp, pop: Float) {
+internal fun StackIcon(n: Notice, size: Dp, pop: Float) {
     val bmp = n.message?.appIcon ?: n.appIcon
     if (bmp != null) {
         Image(bmp, null, Modifier.size(size).scale(pop).clip(RoundedCornerShape(size * 0.27f)))

@@ -131,18 +131,19 @@ object Messages {
         )
         // «Автоцвет фона»: основной цвет значка приложения — цвет фона плашки
         val bg = if (s.autoBg) accentOf(appIcon)?.toArgb()?.toLong() else null
-        IslandBus.post(
-            Notice(
-                title = title.ifEmpty { appName },
-                icon = Ios.load(service, R.drawable.ios_chatbubble_ellipses),
-                tint = Tints.Blue,
-                style = NoticeStyle.MESSAGE,
-                message = message,
-                // Текст читать дольше, чем короткое событие, а с кнопками — ещё дольше: нужно успеть нажать
-                extraMs = if (actions.isEmpty()) 2_000 else 4_500,
-                bg = bg,
-            ),
+        val notice = Notice(
+            title = title.ifEmpty { appName },
+            icon = Ios.load(service, R.drawable.ios_chatbubble_ellipses),
+            tint = Tints.Blue,
+            style = NoticeStyle.MESSAGE,
+            message = message,
+            // Текст читать дольше, чем короткое событие, а с кнопками — ещё дольше: нужно успеть нажать
+            extraMs = if (actions.isEmpty()) 2_000 else 4_500,
+            bg = bg,
         )
+        IslandBus.post(notice)
+        // Авто-стопка: уведомление живёт в острове значком со счётчиком и после того, как плашка ушла
+        if (s.notifStack) IslandBus.pushToStack(notice)
         // Для «Системных плашек»: какой мессенджер и всплывает ли у него ещё своя плашка поверх острова
         SystemBanners.onMessage(sbn.packageName, n.channelId, popsUp = !ranked || ranking.importance >= NotificationManager.IMPORTANCE_HIGH)
     }

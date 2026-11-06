@@ -13,8 +13,8 @@ android {
         applicationId = "app.orubus.island"
         minSdk = 26
         targetSdk = 35
-        versionCode = 20
-        versionName = "1.13.0"
+        versionCode = 21
+        versionName = "1.14.0"
     }
 
     // Ключ подписи в репозитории не хранится: релизный APK собирается без подписи,

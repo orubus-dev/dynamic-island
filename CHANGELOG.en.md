@@ -6,6 +6,14 @@ Versioning: the second number (1.5, 1.6…) means new and changed features, the 
 
 > Since 1.6.1 the app and the island speak English (Features → General → Language). Earlier versions were in Russian only, so older entries give the Russian label in brackets.
 
+## [1.14.0] — 2026-11-07
+
+- 🔖 **Notifications live on the island by themselves** — the whole point of the island: an app notification joins the stack as soon as its banner appears, and when the banner leaves, the island doesn't go empty — the capsule keeps the last app's icon with a red badge counting every notification, like the badge on an iPhone app icon. No more full-size twin cards and no more empty capsules after a swiped-away banner.
+- 👆 **Tap the right side — the whole list** — the right half of the capsule opens every notification at once: icon, sender, text and the app for each row. Tap a row to open the app and drop it from the stack, or hit "Clear all" to remove everything. Tapping the icon on the left still opens the last notification's app.
+- ↔️ **Swipes that don't wreck things** — swiping sideways on the stack capsule flips through notifications (the card slides the way you swiped), up or down just springs back. The stack can no longer be swiped off the screen by accident — the island no longer disappears after a swipe.
+- 🛡 **Popups stop eating each other** — the instant duplicate shield (900 ms) no longer confuses live messages with repeats: for messages it compares the text, so the same notification with NEW text goes through instead of being silenced. Two messages from one chat in a row now both show up, and the popup queue grew from 6 to 24 — a message burst doesn't get lost.
+- ⚙️ The "Stacked notifications" toggle in Notifications now turns the whole auto-stack off (clearing what piled up); its description is updated.
+
 ## [1.13.0] — 2026-10-31
 
 - 🔎 **Stacked notifications — at full banner size** — a banner swiped up no longer shrinks into an icon with a badge: the cutout keeps exactly the same card a regular notification gets — the same width, an app header at camera level, the 40 dp icon, the title and the message text, with "N notifications waiting" and "Clear all" underneath. Swipe sideways to flip through the stack, swipe up to clear it at once, tap to open the app like on a regular banner.

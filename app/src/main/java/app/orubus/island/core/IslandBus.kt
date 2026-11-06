@@ -50,13 +50,15 @@ object IslandBus {
     val stopwatch = MutableStateFlow<StopwatchState?>(null)
     val notice = MutableStateFlow<Notice?>(null)
     /**
-     * Свернутые уведомления: смахнули плашку вверх — она ждёт у выреза полноразмерной плашкой,
-     * как у обычного уведомления. Новые кладутся в конец, сверху — последнее. Живут, пока их
-     * не откроют, не смахнут или пока уведомление не исчезнет из шторки.
+     * Свернутые уведомления: значок последнего уведомления со счётчиком у выреза. Новое сообщение
+     * попадает сюда сразу, как только показалось плашкой, — остров не пустеет, когда плашка ушла.
+     * Живут, пока их не откроют, не смахнут или пока уведомление не исчезнет из шторки.
      */
     val noticeStack = MutableStateFlow<List<Notice>>(emptyList())
     /** Какое уведомление из стопки сейчас показывают свайпом, -1 — самое последнее */
     val stackBrowse = MutableStateFlow(-1)
+    /** Куда листнули последний раз: 1 — к более новому, -1 — к более старому. Для анимации смены */
+    val stackDir = MutableStateFlow(1)
     /** Идёт ввод ответа на уведомление: окну острова нужен фокус, чтобы показать клавиатуру */
     val reply = MutableStateFlow<ReplyState?>(null)
     /** Наклон телефона от -1 до 1: по нему сдвигаются блики Liquid Glass */
@@ -96,7 +98,9 @@ object IslandBus {
     @Volatile
     var lastTouch = 0L
 
-    private val queue = Channel<Notice>(capacity = 6, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+    // Очередь с запасом: шквал сообщений из мессенджеров не должен теряться. DROP_OLDEST остаётся
+    // предохранителем на случай потока событий, но 24 плашки — больше, чем успеют показать
+    private val queue = Channel<Notice>(capacity = 24, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
     init {
         scope.launch {
@@ -131,8 +135,10 @@ object IslandBus {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Long>?) = size > 40
     }
 
-    /** Те же плашки крупными мазками (без текста) — для мгновенного окна [BURST_MS] */
-    private val coarse = HashMap<String, Long>()
+    /** Те же плашки крупными мазками — для мгновенного окна [BURST_MS]. Вместе с временем — текст,
+     *  чтобы живое сообщение с новым текстом не гасилось: раньше два сообщения одного чата подряд
+     *  превращались в одно, потому что ключ у них один и тот же */
+    private val coarse = HashMap<String, Pair<Long, String?>>()
 
     /** Сколько одинаковых плашек погашено с запуска — для отладки «почему не показалось» */
     @Volatile
@@ -163,25 +169,46 @@ object IslandBus {
         synchronized(recent) {
             val last = recent[sig]
             val coarseHit = coarse[burst]
-            if (last != null && now - last < DEDUP_MS || coarseHit != null && now - coarseHit < BURST_MS) {
+            // У событий текст не проверяем — гасим всё подряд в окне [BURST_MS]. У сообщений другой
+            // правило: тот же ключ с НОВЫМ текстом — живое сообщение, оно должно показаться
+            val burstAlive = coarseHit != null && now - coarseHit.first < BURST_MS &&
+                (n.message == null || coarseHit.second == n.message.text)
+            if (last != null && now - last < DEDUP_MS || burstAlive) {
                 deduped++
                 reportShield()
                 return
             }
             recent[sig] = now
-            coarse[burst] = now
+            coarse[burst] = now to n.message?.text
             if (coarse.size > 40) coarse.remove(coarse.keys.first())
         }
         queue.trySend(n)
     }
 
-    /** Смахнули плашку вверх: уведомление прячется в значок со счётчиком, а не исчезает */
+    /**
+     * Смахнули плашку вверх: уведомление не исчезает, а остаётся у выреза значком со счётчиком.
+     * Оно могло попасть в стопку ещё при появлении плашки (авто-стопка) — тогда заменяем, а не дублируем.
+     */
     fun minimizeNotice(n: Notice) {
         if (reply.value?.noticeId == n.id) reply.value = null
-        noticeStack.value = (noticeStack.value + n).takeLast(STACK_MAX)
+        val key = n.message?.key
+        noticeStack.value = (noticeStack.value.filterNot { key != null && it.message?.key == key } + n).takeLast(STACK_MAX)
         stackBrowse.value = -1
+        stackDir.value = 1
         // Сама плашка уходит со сцены — её место сразу занимает значок со счётчиком
         if (notice.value?.id == n.id) notice.value = null
+    }
+
+    /**
+     * Уведомление приложения только что показалось плашкой — и сразу живёт в стопке:
+     * капсула со значком и счётчиком ждёт под плашкой и остаётся, когда та уйдет.
+     * Тот же ключ в стопке заменяется (мессенджеры перезаливают уведомление с новым текстом).
+     */
+    fun pushToStack(n: Notice) {
+        val key = n.message?.key ?: return // авто-стопка — только для уведомлений приложений
+        noticeStack.value = (noticeStack.value.filterNot { it.message?.key == key } + n).takeLast(STACK_MAX)
+        stackBrowse.value = -1
+        stackDir.value = 1
     }
 
     /** Достать уведомление из стопки: последнее, если не просмотривают, иначе — то, на которое смотрят */
@@ -190,9 +217,14 @@ object IslandBus {
         if (list.isEmpty()) return null
         val i = stackBrowse.value.takeIf { it in list.indices } ?: list.lastIndex
         val n = list[i]
-        noticeStack.value = list.minus(n)
-        stackBrowse.value = -1
+        removeFromStack(n)
         return n
+    }
+
+    /** Уведомление открыли или убрали из стопки по одному */
+    fun removeFromStack(n: Notice) {
+        noticeStack.value = noticeStack.value.filterNot { it.id == n.id }
+        stackBrowse.value = -1
     }
 
     /** Листают стопку свайпом: влево — к более новым, вправо — к более старым */
@@ -202,6 +234,7 @@ object IslandBus {
             stackBrowse.value = -1
             return
         }
+        stackDir.value = if (next) 1 else -1
         val from = stackBrowse.value.takeIf { it in list.indices } ?: list.lastIndex
         val to = ((from + if (next) 1 else -1) + list.size) % list.size
         stackBrowse.value = to

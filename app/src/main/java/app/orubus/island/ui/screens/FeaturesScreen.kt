@@ -59,6 +59,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.orubus.island.core.IslandBus
 import app.orubus.island.core.Lang
 import app.orubus.island.core.Tints
 import app.orubus.island.core.tr
@@ -327,10 +328,11 @@ fun NotificationsScreen(onBack: () -> Unit) {
                 SettingsRepo.update { copy(msgInApp = v) }
             }
             GroupToggle(Pos.Middle, Icons.Rounded.Layers, tr("Свёрнутые уведомления", "Stacked notifications"),
-                tr("Смахнутая вверх плашка ждёт у выреза — полноразмерная, листается свайпом вбок",
-                    "A banner swiped up waits by the cutout at full size — browse the stack with sideways swipes"),
+                tr("Уведомления не исчезают: значок последнего приложения и счётчик в капсуле, тап справа — весь список, свайп — листать",
+                    "Notifications stay: last app's icon and a counter in the capsule, tap the right side for the list, swipe to flip through"),
                 s.notifStack, color = Tile.Purple) { v ->
                 SettingsRepo.update { copy(notifStack = v) }
+                if (!v) IslandBus.noticeStack.value = emptyList()
             }
             GroupSlider(
                 Pos.Last, Icons.Rounded.FormatLineSpacing, tr("Строк текста", "Text lines"),
