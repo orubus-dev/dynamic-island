@@ -662,7 +662,7 @@ private fun IslandBody(
             }
             .then(
                 if (s.liquidGlass && !calibrating) {
-                    Modifier.glassSurface(shape, bgBase, s.glassOpacity / 100f, tilt = { tilt.value }, light = lightGlass) { sheen.value }
+                    Modifier.glassSurface(shape, bgBase, s.glassOpacity / 100f, tilt = { tilt.value }, sheen = { sheen.value }, light = lightGlass)
                 } else {
                     Modifier.background(if (calibrating) CalibrationRed else bgBase)
                 },

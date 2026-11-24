@@ -182,7 +182,7 @@ object AdbShield {
     private const val CLSE = 0x45534C43
     private const val VERSION = 0x01000001
 
-    private class Frame(val cmd: Int, val arg0: Int, val arg1: Int, val data: ByteArray)
+    internal class Frame(val cmd: Int, val arg0: Int, val arg1: Int, val data: ByteArray)
 
     internal class Conn(socket: Socket) {
         val input = DataInputStream(BufferedInputStream(socket.getInputStream()))

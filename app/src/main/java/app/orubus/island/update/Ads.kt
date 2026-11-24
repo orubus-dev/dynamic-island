@@ -63,7 +63,7 @@ object Ads {
         val now = System.currentTimeMillis()
         if (!force && ads.value.isNotEmpty() && now - lastFetch < CACHE_MS) return@withContext
         lastFetch = now
-        val fetched = fetchSupabase() ?: fetchRepo()
+        val fetched = fetchSupabase() ?: fetchRepo() ?: emptyList()
         if (fetched.isNotEmpty()) ads.value = fetched
     }
 
