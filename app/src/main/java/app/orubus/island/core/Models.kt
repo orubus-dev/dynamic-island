@@ -310,3 +310,14 @@ fun formatDuration(ms: Long): String {
     val s = total % 60
     return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(m, s)
 }
+
+/** Какие состояния телефона умеет показывать остров (раздел «Состояния»). */
+enum class SysKind {
+    VPN, HOTSPOT, POWER_SAVE, DND, AIRPLANE, SILENT, VIBRATE, LOW_BATTERY, ROAMING, STORAGE, NO_SIM
+}
+
+/** Текущее состояние телефона в острове: [level] — заряд или свободные гигабайты, если уместно. */
+data class SysState(val kind: SysKind, val level: Int = -1) {
+    /** Ключ для сравнения — состояние без цифр одинаково */
+    val stableKey: String get() = kind.name
+}

@@ -231,6 +231,8 @@ class SystemEvents(private val context: Context) {
             )
         }
         darkTheme = (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+        // Светлая Liquid Glass: тема системы нужна и самому острову — чтобы стекло стало светлым вместе с ней
+        IslandBus.darkTheme.value = darkTheme == true
         rotationOn = currentRotation()
         context.contentResolver.registerContentObserver(
             Settings.System.getUriFor(Settings.System.ACCELEROMETER_ROTATION), false, rotationObserver,
@@ -517,6 +519,8 @@ class SystemEvents(private val context: Context) {
         val dark = (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
         val prev = darkTheme
         darkTheme = dark
+        // Светлая Liquid Glass: тема сменилась — стекло перекрашивается само
+        IslandBus.darkTheme.value = dark
         if (prev == null || prev == dark) return
         notice(
             s.evDarkTheme,

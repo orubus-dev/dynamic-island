@@ -196,6 +196,8 @@ class IslandService : AccessibilityService() {
         alarmMonitor = AlarmMonitor(this).also { it.start() }
         // Приватность: точки микрофона и камеры, хотспот
         PrivacyMonitor.start(this, scope)
+        // Состояния телефона: VPN, точка доступа, «Не беспокоить», режим полёта и другие
+        SystemStates.start(this, scope)
         IslandBus.serviceRunning.value = true
 
         // Движок: пульс острова для [IslandEngine] и разрешение на самолечение
@@ -742,6 +744,7 @@ class IslandService : AccessibilityService() {
         alarm?.stop()
         calls?.stop()
         PrivacyMonitor.stop()
+        SystemStates.stop()
         navReader?.stop()
         clockReader?.stop()
         payReader?.stop()

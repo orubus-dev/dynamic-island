@@ -62,6 +62,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
@@ -166,6 +167,9 @@ fun IslandOverlay(
     val nextAlarm by IslandBus.nextAlarm.collectAsState()
     val egg by IslandBus.egg.collectAsState()
     val payReady by IslandBus.payReady.collectAsState()
+    // Состояния телефона: VPN, точка доступа, «Не беспокоить» и другие (раздел «Состояния»)
+    val sysStatesAll by IslandBus.sysStates.collectAsState()
+    val sysStates = sysStatesAll.filter { stateOn(s, it.kind) }
     // Будильник появляется в острове за 12 часов и уходит, когда прозвенел: просыпаемся ровно в эти два момента,
     // а не каждые полминуты. Пока телефон спит, ожидание стоит — поэтому со включением экрана пересчитываем
     val screenOn by IslandBus.screenOn.collectAsState()
@@ -259,6 +263,8 @@ fun IslandOverlay(
         // вместо пустой капсулы теперь живая плашка, которую листают свайпом.
         // В игровом режиме с «Не показывать остров» она прячется вместе со всем островом
         if (s.notifStack && noticeStack.isNotEmpty() && !gameSilent) persistent += Act.StackA(noticeStack)
+        // Состояния телефона — самые тихие: только когда нет ни карточек, ни плашек
+        if (!gameSilent) sysStates.forEach { persistent += Act.SysStateA(it) }
         val alarm = nextAlarm
         if (s.cardAlarm && alarm != null && alarm.triggerAt - alarmNow in 1..ALARM_LEAD_MS) persistent += Act.AlarmA(alarm)
 
@@ -540,10 +546,15 @@ private fun IslandBody(
     val shape = remember(corner, s.notch) { AnimatedIslandShape(corner, s.notch) }
     val accent = (primary as? Act.MediaA)?.m?.accent
     val outlineColor = if (s.outlineFromArt && accent != null) accent else Color(s.outlineColor)
-    // «Автоцвет фона»: плашка окрашивается цветом, подобранным по значку приложения
+    // Светлая Liquid Glass: стекло светлое, когда Liquid Glass включен и тема/настройка того ждут
+    val darkThemeNow by IslandBus.darkTheme.collectAsState()
+    val lightGlass = s.liquidGlass && !calibrating && glassLightOn(s, darkThemeNow)
+    // «Автоцвет фона»: плашка окрашивается цветом, подобранным по значку приложения.
+    // Светлое стекло — молочная база вместо чёрной (bgBase перекрашивается целиком)
     val bgBase = (primary as? Act.NoticeA)?.n?.bg
         ?.takeIf { s.autoBg }
-        ?.let { Color(it) } ?: Color(s.color)
+        ?.let { Color(it) }
+        ?: if (lightGlass) LightGlassBase else Color(s.color)
     // Рамка по состоянию: «малая» — у капсулы, «большая» — у раскрытого острова и плашек
     val borderOn = if (expanded || primary is Act.NoticeA) s.outline && s.borderExpanded else s.outline && s.borderSmall
 
@@ -613,6 +624,10 @@ private fun IslandBody(
     val settings by rememberUpdatedState(s)
     val egg by IslandBus.egg.collectAsState()
 
+    CompositionLocalProvider(
+        LocalIslandInk provides if (lightGlass) IslandInkDark else Color.White,
+        LocalIslandDim provides if (lightGlass) IslandDimDark else Color.White.copy(alpha = 0.55f),
+    ) {
     Box(
         Modifier
             .onGloballyPositioned { onBounds(it.boundsInWindow()) }
@@ -647,7 +662,7 @@ private fun IslandBody(
             }
             .then(
                 if (s.liquidGlass && !calibrating) {
-                    Modifier.glassSurface(shape, bgBase, s.glassOpacity / 100f, tilt = { tilt.value }) { sheen.value }
+                    Modifier.glassSurface(shape, bgBase, s.glassOpacity / 100f, tilt = { tilt.value }, light = lightGlass) { sheen.value }
                 } else {
                     Modifier.background(if (calibrating) CalibrationRed else bgBase)
                 },
@@ -845,6 +860,7 @@ private fun IslandBody(
             }
         }
     }
+    }
 }
 
 /**
@@ -1013,6 +1029,7 @@ private fun Bubble(act: Act, s: IslandSettings) {
     val haptic = rememberHaptic()
     val tilt = IslandBus.glassTilt.collectAsState()
     val now = rememberNow(500, active = act is Act.TimerA)
+    val darkThemeNow by IslandBus.darkTheme.collectAsState()
     // «Двойной остров»: второй вырез — капсула, а не кружок
     val shape = if (s.dualNotch) RoundedCornerShape(h / 2) else CircleShape
     val dualWidth = if (s.dualNotch) h * 2.1f else h
@@ -1022,7 +1039,7 @@ private fun Bubble(act: Act, s: IslandSettings) {
             .then(if (s.shadow && !s.reduceEffects) Modifier.shadow(8.dp, shape) else Modifier)
             .clip(shape)
             .then(
-                if (s.liquidGlass) Modifier.glassSurface(shape, Color(s.color), s.glassOpacity / 100f, tilt = { tilt.value })
+                if (s.liquidGlass) Modifier.glassSurface(shape, if (glassLightOn(s, darkThemeNow)) LightGlassBase else Color(s.color), s.glassOpacity / 100f, tilt = { tilt.value }, light = glassLightOn(s, darkThemeNow))
                 else Modifier.background(Color(s.color)),
             )
             .then(if (s.outline && s.borderSmall) Modifier.border(s.outlineWidth.dp, Color(s.outlineColor), shape) else Modifier)

@@ -117,6 +117,7 @@ import app.orubus.island.ui.Tile
 import app.orubus.island.ui.ToggleCard
 import app.orubus.island.ui.Ui
 import app.orubus.island.ui.UpdateSection
+import app.orubus.island.update.Ads
 import app.orubus.island.update.UpdateChecker
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -257,6 +258,49 @@ fun HomeScreen(open: (Screen) -> Unit) {
                 tr("Событие, сообщение, звонок, оплата — прямо в острове", "An event, message, call, payment — right in the island"),
                 color = Tile.Gray, onClick = { open(Screen.TESTS) },
             ) { Arrow() }
+        }
+
+        // Реклама только своих продуктов: одна карточка, никаких сторонних сетей
+        OrubusPromoCard()
+    }
+}
+
+/** Карточка «От Orubus»: наши приложения и новости. Прячется навсегда одной кнопкой. */
+@Composable
+private fun OrubusPromoCard() {
+    val context = LocalContext.current
+    val s by SettingsRepo.state.collectAsState()
+    LaunchedEffect(Unit) { Ads.refresh(context) }
+    val ads by Ads.ads.collectAsState()
+    if (!s.adsEnabled) return
+    val ad = remember(ads.size) { Ads.pick() } ?: return
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(28.dp))
+            .background(Ui.Card)
+            .border(1.dp, Ui.GlassBorder, RoundedCornerShape(28.dp))
+            .padding(20.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(tr("От Orubus", "From Orubus"), color = Ui.Sub, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            Text(
+                tr("Скрыть", "Hide"), color = Ui.Sub, fontSize = 13.sp,
+                modifier = Modifier.clickable { SettingsRepo.update { copy(adsEnabled = false) } },
+            )
+        }
+        Spacer(Modifier.height(10.dp))
+        Text(ad.title, color = Ui.Text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        if (ad.text.isNotBlank()) {
+            Spacer(Modifier.height(4.dp))
+            Text(ad.text, color = Ui.Sub, fontSize = 14.sp, lineHeight = 18.sp)
+        }
+        Spacer(Modifier.height(12.dp))
+        Box(
+            Modifier.clip(CircleShape).background(Ui.Primary).clickable { Ads.open(context, ad) }
+                .padding(horizontal = 18.dp, vertical = 10.dp),
+        ) {
+            Text(tr("Открыть", "Open"), color = Ui.OnPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }
@@ -443,7 +487,7 @@ fun PermissionsScreen(onBack: () -> Unit, open: (Screen) -> Unit) {
                 badge = tr("Новое", "New"),
             ) { Status(AdbShield.headsUpOff(context.contentResolver) == true) }
             GroupItem(
-                Pos.Last, Icons.Rounded.Security, tr("Самолечение через adb", "Self-heal over adb"),
+                Pos.Last, Icons.Rounded.Security, tr("Самолечение по Wi-Fi", "Self-heal over wireless debugging"),
                 if (health.canSelfHeal) tr("Включено — остров поднимается сам", "On — the island revives itself")
                 else tr("Одна команда через беспроводную отладку", "One command via wireless debugging"),
                 onClick = { open(Screen.KEEPALIVE) }, color = Tile.Indigo,

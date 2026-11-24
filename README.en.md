@@ -10,7 +10,7 @@
 
 Notifications with reply · navigation · payments · music with lyrics · calls · timers · downloads · charging · flashlight · system events
 
-[![Version 1.14.0](https://img.shields.io/badge/version-1.14.0-C6C3F7?style=for-the-badge&labelColor=1C1B22)](https://github.com/orubus-dev/dynamic-island/releases/latest)
+[![Version 2.0.0](https://img.shields.io/badge/version-2.0.0-C6C3F7?style=for-the-badge&labelColor=1C1B22)](https://github.com/orubus-dev/dynamic-island/releases/latest)
 [![Build](https://img.shields.io/github/actions/workflow/status/orubus-dev/dynamic-island/android.yml?style=for-the-badge&label=build&labelColor=1C1B22)](https://github.com/orubus-dev/dynamic-island/actions)
 ![Android 8+](https://img.shields.io/badge/Android-8.0%2B-3DDC84?style=flat-square&logo=android&logoColor=white)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.1-7F52FF?style=flat-square&logo=kotlin&logoColor=white)
@@ -21,6 +21,15 @@ Notifications with reply · navigation · payments · music with lyrics · calls
 </div>
 
 ---
+
+## What's new in 2.0.0
+
+- 🌍 **Eight languages** — Español · Français · Deutsch · Português · العربية next to Russian and English, a language picker on first launch and a switcher in settings (Features → Language).
+- 📡 **Self-heal via Wireless debugging (Android 11+)** — pair with the six-digit code inside the island: TLS 1.3 + SPAKE2, a 1:1 port of the `adb pair` protocol. One pairing and the island revives itself after any crash.
+- 📶 **Ten new island states** — VPN, hotspot, Do not disturb, airplane mode, silent and vibrate, battery saver, low battery, roaming, storage low, no SIM — each with its own toggle under System alerts → States.
+- 🪞 **Light Liquid Glass** — in light theme the glass turns milky with dark ink, caustics and a dark lens rim: refraction and blur in both themes.
+- 📣 **Own-product promos only** — a "From Orubus" card (Relay, MANGACA, Payworth, Sol…) fed from the repo or your own Supabase project, hideable forever with one tap.
+- 🩹 **Recovery that actually recovers** — the notification listener rebinds too; a successful heal shows an "Island revived" pill.
 
 ## What's new in 1.14.0
 

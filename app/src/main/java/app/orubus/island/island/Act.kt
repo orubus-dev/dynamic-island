@@ -10,6 +10,7 @@ import app.orubus.island.core.Notice
 import app.orubus.island.core.PayReady
 import app.orubus.island.core.ProgressInfo
 import app.orubus.island.core.StopwatchState
+import app.orubus.island.core.SysState
 import app.orubus.island.core.TimerState
 import app.orubus.island.core.TorchState
 
@@ -51,4 +52,10 @@ sealed class Act(val id: String, val transient: Boolean = false) {
     data class AlarmA(val a: AlarmInfo) : Act("alarm") {
         override val pkg: String? get() = a.pkg
     }
+    /**
+     * Состояние телефона: VPN, точка доступа, «Не беспокоить», режим полёта и другие (раздел
+     * «Состояния»). transient: не раскрывается и не уходит в пузырь — только капсула, пока
+     * нечего показать поважнее.
+     */
+    data class SysStateA(val st: SysState) : Act("state-${st.kind.name}", transient = true)
 }

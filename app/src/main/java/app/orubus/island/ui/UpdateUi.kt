@@ -242,4 +242,4 @@ private fun inline(text: String): AnnotatedString = buildAnnotatedString {
 }
 
 /** «Что нового» внутри приложения на его языке. */
-private fun whatsNewFile() = if (Lang.en) "whatsnew.en.md" else "whatsnew.md"
+private fun whatsNewFile() = if (Lang.code == "ru") "whatsnew.md" else "whatsnew.en.md"

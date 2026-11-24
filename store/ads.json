@@ -1,0 +1,65 @@
+[
+  {
+    "id": "orubus-ai",
+    "title": "Orubus AI",
+    "text": "The go-to assistant of the Orubus ecosystem — Telegram + Discord, live portfolio stats, research and community management.",
+    "url": "https://app.orubus.ai",
+    "weight": 3
+  },
+  {
+    "id": "relay",
+    "title": "Relay",
+    "text": "Realtime messaging built on speed, reliability and privacy — Android + Windows, end-to-end encrypted.",
+    "url": "https://github.com/orubus-dev/Relay",
+    "weight": 2
+  },
+  {
+    "id": "mangaca",
+    "title": "MANGACA",
+    "text": "Read beyond the illusion: manga, novels, classics + full TV and movie streaming in one app.",
+    "url": "https://mangaca.pages.dev",
+    "weight": 2
+  },
+  {
+    "id": "payworth",
+    "title": "Payworth",
+    "text": "The earn platform: tasks, games, mining and a marketplace that pays real money.",
+    "url": "https://payworth.pages.dev",
+    "weight": 2
+  },
+  {
+    "id": "sol",
+    "title": "Sol Launcher",
+    "text": "A modern minimalist Android launcher by Orubus — fast, clean, beautiful.",
+    "url": "https://github.com/orubus-dev/Sol",
+    "weight": 1
+  },
+  {
+    "id": "buks",
+    "title": "Buks",
+    "text": "Ad-free novel downloader and EPUB reader — the Orubus reading stack.",
+    "url": "https://github.com/orubus-dev/buks",
+    "weight": 1
+  },
+  {
+    "id": "fossil",
+    "title": "Fossil Launcher",
+    "text": "The Orubus liquid-glass launcher — glass surfaces, refraction, depth.",
+    "url": "https://github.com/orubus-dev/fossil-launcher",
+    "weight": 1
+  },
+  {
+    "id": "omnihub",
+    "title": "OmniHub",
+    "text": "Universal AI aggregator and Android assistant: multi-provider, offline history, MCP skills.",
+    "url": "https://github.com/orubus-dev/OmniHub",
+    "weight": 1
+  },
+  {
+    "id": "gene",
+    "title": "Gene",
+    "text": "An artificial organism on your phone: HDC concept cortex, causal world model, learns offline. Not a token LLM.",
+    "url": "https://github.com/orubus-dev/Gene",
+    "weight": 1
+  }
+]

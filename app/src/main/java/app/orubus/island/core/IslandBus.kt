@@ -94,6 +94,10 @@ object IslandBus {
     val gameForeground = MutableStateFlow(false)
     /** Играет та самая песня — остров празднует (пасхалка, Egg.kt) */
     val egg = MutableStateFlow(false)
+    /** Тема системы тёмная: для светлой Liquid Glass — стекло перекрашивается вместе с темой */
+    val darkTheme = MutableStateFlow(true)
+    /** Состояния телефона (SystemStates): VPN, точка доступа, «Не беспокоить», режим полёта… */
+    val sysStates = MutableStateFlow<List<SysState>>(emptyList())
     /** Последнее касание раскрытого острова — чтобы не сворачивать его из-под пальца */
     @Volatile
     var lastTouch = 0L

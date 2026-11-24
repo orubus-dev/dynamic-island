@@ -35,9 +35,19 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AirplanemodeActive
+import androidx.compose.material.icons.rounded.BatterySaver
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.DoNotDisturbOn
 import androidx.compose.material.icons.rounded.Face
+import androidx.compose.material.icons.rounded.NotificationsOff
+import androidx.compose.material.icons.rounded.Public
+import androidx.compose.material.icons.rounded.SimCardAlert
+import androidx.compose.material.icons.rounded.Storage
+import androidx.compose.material.icons.rounded.Vibration
 import androidx.compose.material.icons.rounded.Videocam
+import androidx.compose.material.icons.rounded.VpnKey
+import androidx.compose.material.icons.rounded.WifiTethering
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.runtime.DisposableEffect
@@ -111,6 +121,8 @@ import app.orubus.island.core.ReplyState
 import app.orubus.island.core.MediaInfo
 import app.orubus.island.core.Notice
 import app.orubus.island.core.NoticeStyle
+import app.orubus.island.core.SysKind
+import app.orubus.island.core.SysState
 import app.orubus.island.core.Tints
 import app.orubus.island.core.formatDuration
 import app.orubus.island.data.IslandSettings
@@ -162,7 +174,7 @@ fun CompactContent(act: Act, s: IslandSettings, wideWidth: Dp) {
                 Text(emoji, fontSize = (s.height.dp.value * 0.55f).sp, modifier = Modifier.padding(start = s.height.dp * 0.3f))
             }
             AnimatedVisibility(s.evLock && keyguard && emoji.isEmpty(), enter = fadeIn() + scaleIn(), exit = fadeOut() + scaleOut()) {
-                Icon(Ios.lock, null, tint = Color.White, modifier = Modifier.padding(start = s.height.dp * 0.38f).size(s.height.dp * 0.46f))
+                Icon(Ios.lock, null, tint = LocalIslandInk.current, modifier = Modifier.padding(start = s.height.dp * 0.38f).size(s.height.dp * 0.46f))
             }
             // Точки приватности: микрофон и камера заняты — как индикатор Android, но у острова
             val mic by IslandBus.micActive.collectAsState()
@@ -309,6 +321,9 @@ fun CompactContent(act: Act, s: IslandSettings, wideWidth: Dp) {
 
         is Act.PayA -> PayReady(tr("Оплата", "Pay"), tr("К терминалу", "Hold near reader"), act.p.icon, s, wideWidth)
 
+        // Состояние телефона: VPN, точка доступа, «Не беспокоить» и другие — значок и короткое слово
+        is Act.SysStateA -> SysStateCompact(act.st, h, gap, side)
+
     }
 }
 
@@ -396,7 +411,7 @@ private fun MediaCompact(m: MediaInfo, s: IslandSettings) {
             when {
                 egg -> SoulHeart(Modifier.size(h * 0.5f))
                 line != null -> FitText(
-                    line, Color.White.copy(alpha = 0.92f), 14.sp, 10.sp, FontWeight.Medium,
+                    line, LocalIslandInk.current.copy(alpha = 0.92f), 14.sp, 10.sp, FontWeight.Medium,
                     Modifier.size(width = h * 2.3f, height = h * 0.6f),
                 )
                 else -> Equalizer(accent, m.playing, s.liveEqualizer, Modifier.size(h * 0.6f, h * 0.42f))
@@ -446,7 +461,7 @@ private fun NetSpeed(modifier: Modifier = Modifier, height: Dp) {
     }
     if (text.isNotEmpty()) {
         Text(
-            text, color = Color.White.copy(alpha = 0.9f),
+            text, color = LocalIslandInk.current.copy(alpha = 0.9f),
             fontSize = (height.value * 0.34f).sp, fontWeight = FontWeight.SemiBold,
             maxLines = 1, softWrap = false, modifier = modifier,
         )
@@ -509,7 +524,7 @@ private fun StackCard(items: List<Notice>, s: IslandSettings) {
         CompactRow(h, compactGap(s), h * 2.4f,
             left = {
                 if (secret) {
-                    Icon(Ios.lock, null, tint = Color.White, modifier = Modifier.size(h * 0.5f))
+                    Icon(Ios.lock, null, tint = LocalIslandInk.current, modifier = Modifier.size(h * 0.5f))
                 } else {
                     StackIcon(entry, h * 0.58f, 1f)
                 }
@@ -786,7 +801,7 @@ private fun MessageCard(n: Notice, m: AppMessage, s: IslandSettings, @Suppress("
     val replyAction = reply?.takeIf { it.noticeId == n.id && !locked }?.action
     val accent = rememberAccent(s, m.accent)
     var open by remember(n.id) { mutableStateOf(false) }
-    val dim = Color.White.copy(alpha = 0.55f)
+    val dim = LocalIslandDim.current
 
     // Пока отвечают или листают переписку, плашка не уходит по таймеру
     DisposableEffect(open, replyAction != null) {
@@ -830,7 +845,7 @@ private fun MessageCard(n: Notice, m: AppMessage, s: IslandSettings, @Suppress("
             Column(Modifier.weight(1f)) {
                 Row(Modifier.fillMaxWidth().heightIn(min = 22.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        if (hidden) m.appName else n.title, color = Color.White, fontSize = 15.sp, lineHeight = 20.sp,
+                        if (hidden) m.appName else n.title, color = LocalIslandInk.current, fontSize = 15.sp, lineHeight = 20.sp,
                         fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
                     )
                     if (m.history.size > 1 && !hidden) {
@@ -846,14 +861,14 @@ private fun MessageCard(n: Notice, m: AppMessage, s: IslandSettings, @Suppress("
                 } else if (open && m.history.size > 1) {
                     m.history.forEachIndexed { i, line ->
                         Text(
-                            line, color = Color.White.copy(alpha = if (i == m.history.lastIndex) 0.9f else 0.6f),
+                            line, color = LocalIslandInk.current.copy(alpha = if (i == m.history.lastIndex) 0.9f else 0.6f),
                             fontSize = 14.sp, lineHeight = 19.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.padding(bottom = 2.dp),
                         )
                     }
                 } else if (m.text.isNotEmpty()) {
                     Text(
-                        m.text, color = Color.White.copy(alpha = 0.88f), fontSize = 14.sp, lineHeight = 19.sp, maxLines = s.msgLines.coerceIn(1, 8),
+                        m.text, color = LocalIslandInk.current.copy(alpha = 0.88f), fontSize = 14.sp, lineHeight = 19.sp, maxLines = s.msgLines.coerceIn(1, 8),
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
@@ -946,7 +961,7 @@ private fun NotifIcon(m: AppMessage, n: Notice, size: Dp, ring: Color) {
             Image(big, null, Modifier.size(size).clip(CircleShape), contentScale = ContentScale.Crop)
         } else {
             Box(Modifier.size(size).clip(CircleShape).background(Color(0xFF2C2C2E)), contentAlignment = Alignment.Center) {
-                Icon(n.icon, null, tint = Color.White, modifier = Modifier.size(size * 0.5f))
+                Icon(n.icon, null, tint = LocalIslandInk.current, modifier = Modifier.size(size * 0.5f))
             }
         }
         if (m.avatar != null && m.appIcon != null) {
@@ -1028,7 +1043,7 @@ private fun ReplyField(action: MsgAction, accent: Color, onSend: (String) -> Uni
                 value = text,
                 onValueChange = { text = it },
                 singleLine = true,
-                textStyle = TextStyle(color = Color.White, fontSize = 15.sp, fontFamily = Inter),
+                textStyle = TextStyle(color = LocalIslandInk.current, fontSize = 15.sp, fontFamily = Inter),
                 cursorBrush = SolidColor(accent),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                 keyboardActions = KeyboardActions(onSend = { onSend(text) }),
@@ -1065,7 +1080,7 @@ private fun PayReady(title: String, caption: String?, appIcon: ImageBitmap?, s: 
         Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
             ContactlessWaves(Tints.Lavender, !s.reduceEffects, Modifier.size(height * 0.42f))
             Spacer(Modifier.width(10.dp))
-            Text(title, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+            Text(title, color = LocalIslandInk.current, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
         }
         Spacer(Modifier.width(compactGap(s)))
         Row(Modifier.weight(1f), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
@@ -1094,7 +1109,7 @@ private fun PayDone(n: Notice, s: IslandSettings, wideWidth: Dp) {
         Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
             CheckBadge(n.tint, !s.reduceEffects, Modifier.size(height * 0.42f))
             Spacer(Modifier.width(10.dp))
-            Text(n.title, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+            Text(n.title, color = LocalIslandInk.current, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
         }
         Spacer(Modifier.width(compactGap(s)))
         Row(Modifier.weight(1f), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
@@ -1171,14 +1186,14 @@ private fun LiveBanner(n: Notice, l: LiveInfo, s: IslandSettings, wideWidth: Dp)
             Box(Modifier.scale(pop.value)) { LiveGlyph(l, height * 0.39f, tint) }
             Spacer(Modifier.width(10.dp))
             Text(
-                l.distance ?: l.title, color = Color.White, fontSize = if (l.distance != null) 19.sp else 16.sp,
+                l.distance ?: l.title, color = LocalIslandInk.current, fontSize = if (l.distance != null) 19.sp else 16.sp,
                 style = Digits.copy(fontWeight = FontWeight.Bold), maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
         }
         Spacer(Modifier.width(compactGap(s)))
         Column(Modifier.weight(1f), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.Center) {
             if (l.text.isNotBlank()) {
-                Text(l.text, color = Color.White.copy(alpha = 0.85f), fontSize = 13.sp, lineHeight = 16.sp, maxLines = 1,
+                Text(l.text, color = LocalIslandInk.current.copy(alpha = 0.85f), fontSize = 13.sp, lineHeight = 16.sp, maxLines = 1,
                     overflow = TextOverflow.Ellipsis, textAlign = TextAlign.End)
             }
             // На узкой плашке — коротко: «12:31 · 19 ч»; полностью — в раскрытом виде
@@ -1224,7 +1239,7 @@ private fun IncomingCall(c: CallInfo, s: IslandSettings, wideWidth: Dp) {
         Spacer(Modifier.width(11.dp))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
             Text(tr("Входящий вызов", "Incoming call"), color = Tints.Gray, fontSize = 12.5.sp, lineHeight = 15.sp, maxLines = 1)
-            Text(c.name, color = Color.White, fontSize = 18.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
+            Text(c.name, color = LocalIslandInk.current, fontSize = 18.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
                 overflow = TextOverflow.Ellipsis)
         }
         Spacer(Modifier.width(8.dp))
@@ -1236,4 +1251,86 @@ private fun IncomingCall(c: CallInfo, s: IslandSettings, wideWidth: Dp) {
             Controls.answerCall(context, c)
         }
     }
+}
+
+// ─────────────────── Состояния телефона (раздел «Состояния») ───────────────────
+
+/** Включено ли состояние в настройках: выключатели раздела «Состояния» в «Системных оповещениях». */
+internal fun stateOn(s: IslandSettings, kind: SysKind): Boolean = when (kind) {
+    SysKind.VPN -> s.stVpn
+    SysKind.HOTSPOT -> s.stHotspot
+    SysKind.POWER_SAVE -> s.stPowerSave
+    SysKind.DND -> s.stDnd
+    SysKind.AIRPLANE -> s.stAirplane
+    SysKind.SILENT, SysKind.VIBRATE -> s.stRinger
+    SysKind.LOW_BATTERY -> s.stLowBattery
+    SysKind.ROAMING -> s.stRoaming
+    SysKind.STORAGE -> s.stStorage
+    SysKind.NO_SIM -> s.stSim
+}
+
+/** Значок состояния: свои для каждого, DND — луна, как у iPhone. */
+@Composable
+internal fun SysStateIcon(kind: SysKind, tint: Color, size: Dp) {
+    when (kind) {
+        SysKind.VPN -> Icon(Icons.Rounded.VpnKey, null, tint = tint, modifier = Modifier.size(size))
+        SysKind.HOTSPOT -> Icon(Icons.Rounded.WifiTethering, null, tint = tint, modifier = Modifier.size(size))
+        SysKind.POWER_SAVE -> Icon(Icons.Rounded.BatterySaver, null, tint = tint, modifier = Modifier.size(size))
+        SysKind.DND -> Icon(Ios.moon, null, tint = tint, modifier = Modifier.size(size))
+        SysKind.AIRPLANE -> Icon(Icons.Rounded.AirplanemodeActive, null, tint = tint, modifier = Modifier.size(size))
+        SysKind.SILENT -> Icon(Icons.Rounded.NotificationsOff, null, tint = tint, modifier = Modifier.size(size))
+        SysKind.VIBRATE -> Icon(Icons.Rounded.Vibration, null, tint = tint, modifier = Modifier.size(size))
+        SysKind.LOW_BATTERY -> Icon(Ios.batteryFull, null, tint = tint, modifier = Modifier.size(size))
+        SysKind.ROAMING -> Icon(Icons.Rounded.Public, null, tint = tint, modifier = Modifier.size(size))
+        SysKind.STORAGE -> Icon(Icons.Rounded.Storage, null, tint = tint, modifier = Modifier.size(size))
+        SysKind.NO_SIM -> Icon(Icons.Rounded.SimCardAlert, null, tint = tint, modifier = Modifier.size(size))
+    }
+}
+
+/** Цвет состояния: тревожные — красные, службы — синие, режимы — серые/фиолетовые. */
+internal fun sysTint(kind: SysKind): Color = when (kind) {
+    SysKind.VPN -> Tints.Blue
+    SysKind.HOTSPOT -> Tints.Blue
+    SysKind.POWER_SAVE -> Tints.Yellow
+    SysKind.DND -> Tints.Purple
+    SysKind.AIRPLANE -> Tints.Orange
+    SysKind.SILENT, SysKind.VIBRATE -> Tints.Gray
+    SysKind.LOW_BATTERY -> Tints.Red
+    SysKind.ROAMING -> Tints.Orange
+    SysKind.STORAGE -> Tints.Orange
+    SysKind.NO_SIM -> Tints.Red
+}
+
+/** Название состояния. */
+internal fun sysTitle(kind: SysKind): String = when (kind) {
+    SysKind.VPN -> tr("VPN", "VPN")
+    SysKind.HOTSPOT -> tr("Точка доступа", "Hotspot")
+    SysKind.POWER_SAVE -> tr("Экономия заряда", "Battery saver")
+    SysKind.DND -> tr("Не беспокоить", "Do not disturb")
+    SysKind.AIRPLANE -> tr("Режим полёта", "Airplane mode")
+    SysKind.SILENT -> tr("Без звука", "Silent")
+    SysKind.VIBRATE -> tr("Вибрация", "Vibrate")
+    SysKind.LOW_BATTERY -> tr("Низкий заряд", "Low battery")
+    SysKind.ROAMING -> tr("Роуминг", "Roaming")
+    SysKind.STORAGE -> tr("Мало места", "Storage low")
+    SysKind.NO_SIM -> tr("Нет SIM-карты", "No SIM")
+}
+
+/** Подпись состояния: сколько заряда, сколько гигабайт свободно и так далее. */
+internal fun sysState(st: SysState): String? = when (st.kind) {
+    SysKind.LOW_BATTERY -> if (st.level >= 0) "${st.level}%" else null
+    SysKind.STORAGE -> if (st.level > 0) "${st.level} " + tr("ГБ", "GB") else null
+    else -> null
+}
+
+/** Состояние в капсуле: значок слева, короткое название у правого края. */
+@Composable
+private fun SysStateCompact(st: SysState, h: Dp, gap: Dp, side: Dp) {
+    val tint = sysTint(st.kind)
+    CompactRow(h, gap, side * 1.4f,
+        left = { SysStateIcon(st.kind, tint, h * 0.5f) },
+        right = {
+            Text(sysTitle(st.kind), color = tint, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+        },
+    )
 }

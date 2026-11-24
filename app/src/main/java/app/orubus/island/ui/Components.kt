@@ -64,13 +64,17 @@ fun IslandSwitch(checked: Boolean, onChange: (Boolean) -> Unit, enabled: Boolean
         checked = checked,
         onCheckedChange = onChange,
         enabled = enabled,
-        thumbContent = {
-            Icon(
-                if (checked) Icons.Rounded.Check else Icons.Rounded.Close,
-                contentDescription = null,
-                modifier = Modifier.size(SwitchDefaults.IconSize),
-            )
-        },
+        // Крестик в бегунке больше не рисуется: раньше на части ROM-ов он проступал на выключенных
+        // тумблерах — включая весь раздел «Оплата» — и выглядел как кнопка удаления
+        thumbContent = if (checked) {
+            {
+                Icon(
+                    Icons.Rounded.Check,
+                    contentDescription = null,
+                    modifier = Modifier.size(SwitchDefaults.IconSize),
+                )
+            }
+        } else null,
         colors = SwitchDefaults.colors(
             checkedThumbColor = Ui.OnPrimary,
             checkedTrackColor = Ui.Primary,
@@ -79,7 +83,6 @@ fun IslandSwitch(checked: Boolean, onChange: (Boolean) -> Unit, enabled: Boolean
             uncheckedThumbColor = Ui.Sub,
             uncheckedTrackColor = Ui.IconBg,
             uncheckedBorderColor = Color.Transparent,
-            uncheckedIconColor = Color.Transparent,
         ),
     )
 }

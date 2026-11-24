@@ -86,17 +86,36 @@ enum class AccentMode(private val ru: String, private val en: String, private va
     val hint: String get() = tr(hintRu, hintEn)
 }
 
-/** Язык приложения и острова. «Как в системе» — русский, если телефон на русском, иначе английский. */
+/** Язык приложения и острова. «Как в системе» — язык телефона, а если он незнаком — английский. */
 @Serializable
 enum class AppLanguage {
-    SYSTEM, RU, EN;
+    SYSTEM, RU, EN, ES, FR, DE, PT, AR;
 
-    val title: String
+    /** Название языка по-своему — в меню выбора языков всегда выглядит одинаково */
+    val native: String
         get() = when (this) {
             SYSTEM -> tr("Как в системе", "System default")
             RU -> "Русский"
             EN -> "English"
+            ES -> "Español"
+            FR -> "Français"
+            DE -> "Deutsch"
+            PT -> "Português"
+            AR -> "العربية"
         }
+
+    val title: String get() = native
+}
+
+/** Стекло острова в светлой или тёмной теме. */
+@Serializable
+enum class GlassLight(private val ru: String, private val en: String) {
+    AUTO("Как в системе", "Follow the system theme"),
+    DARK("Всегда тёмное", "Always dark"),
+    LIGHT("Всегда светлое", "Always light"),
+    ;
+
+    val title: String get() = tr(ru, en)
 }
 
 /** Поведение острова в альбомной ориентации. */
@@ -266,6 +285,8 @@ data class IslandSettings(
     val glassOpacity: Int = 68,
     /** При раскрытии фон под стеклом размывается (Android 12+); без аппаратного размытия тихо не работает */
     val glassBlurBehind: Boolean = true,
+    /** Светлое стекло: по теме системы, всегда тёмное или всегда светлое */
+    val glassLight: GlassLight = GlassLight.AUTO,
 
     // Анимации
     val expandStyle: ExpandStyle = ExpandStyle.FRUIT,
@@ -359,6 +380,31 @@ data class IslandSettings(
     val msgLines: Int = 3,
     /** Уведомления приложения, которое сейчас открыто, тоже приходят в остров */
     val msgInApp: Boolean = false,
+
+    // ── 2.0: состояния телефона — постоянные капсулы ──
+    /** VPN включён — щит в капсуле, пока туннель поднят */
+    val stVpn: Boolean = true,
+    /** Точка доступа включена — телефон делится интернетом */
+    val stHotspot: Boolean = true,
+    /** Экономия заряда Android включена */
+    val stPowerSave: Boolean = true,
+    /** «Не беспокоить» активно — луна в капсуле */
+    val stDnd: Boolean = true,
+    /** Режим полёта — радиомодули выключены */
+    val stAirplane: Boolean = true,
+    /** Без звука или вибрация — перечёркнутый колокольчик */
+    val stRinger: Boolean = true,
+    /** Заряд 15% и ниже, пока не заряжается — батарейка красная */
+    val stLowBattery: Boolean = true,
+    /** Передача данных в роуминге */
+    val stRoaming: Boolean = false,
+    /** Свободного места меньше 1,5 ГБ */
+    val stStorage: Boolean = true,
+    /** SIM-карта не вставлена или не работает */
+    val stSim: Boolean = true,
+
+    /** Новости и приложения Orubus: карточка на главной и реклама своих продуктов */
+    val adsEnabled: Boolean = true,
     /**
      * Свёрнутые уведомления: уведомления приложений остаются в острове значком последнего со
      * счётчиком — сразу при появлении плашки, не только после смахивания. Тап справа открывает

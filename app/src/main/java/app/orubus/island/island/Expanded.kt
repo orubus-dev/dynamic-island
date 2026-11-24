@@ -120,7 +120,7 @@ import app.orubus.island.service.ClockScreenReader
 import java.text.SimpleDateFormat
 import java.util.Date
 
-private val Dim = Color.White.copy(alpha = 0.55f)
+private val Dim: Color @Composable get() = LocalIslandDim.current
 
 /**
  * Весь список уведомлений стопки — то, что открывается тапом по правой половине капсулы:
@@ -136,7 +136,7 @@ private fun StackExpanded(items: List<Notice>, s: IslandSettings) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 tr("Уведомления", "Notifications"),
-                color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold,
+                color = LocalIslandInk.current, fontSize = 17.sp, fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.weight(1f),
             )
             if (items.isNotEmpty()) {
@@ -202,7 +202,7 @@ private fun StackRow(n: Notice, locked: Boolean, onOpen: () -> Unit) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     if (hidden) app else n.title.ifBlank { app },
-                    color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+                    color = LocalIslandInk.current, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
                     maxLines = 1, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false),
                 )
@@ -211,7 +211,7 @@ private fun StackRow(n: Notice, locked: Boolean, onOpen: () -> Unit) {
             }
             if (!hidden && !text.isNullOrBlank()) {
                 Text(
-                    text, color = Color.White.copy(alpha = 0.82f), fontSize = 14.sp, lineHeight = 18.sp,
+                    text, color = LocalIslandInk.current.copy(alpha = 0.82f), fontSize = 14.sp, lineHeight = 18.sp,
                     maxLines = 2, overflow = TextOverflow.Ellipsis,
                 )
             }
@@ -259,7 +259,7 @@ private fun MediaExpanded(m: MediaInfo, s: IslandSettings, lyrics: Lyrics?) {
             Art(m.art, 60.dp, 14.4.dp, Modifier.clickable { Controls.openApp(context, m.pkg) })
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
-                Text(m.title, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
+                Text(m.title, color = LocalIslandInk.current, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
                     modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE))
                 if (m.artist.isNotBlank()) {
                     Spacer(Modifier.height(3.dp))
@@ -299,7 +299,7 @@ private fun MediaExpanded(m: MediaInfo, s: IslandSettings, lyrics: Lyrics?) {
             Spacer(Modifier.height(12.dp))
             Text(
                 if (status?.second == LyricsStatus.LOADING) tr("Ищу текст песни…", "Looking for lyrics…") else tr("Текст песни не найден", "No lyrics found"),
-                color = Color.White.copy(alpha = 0.35f), fontSize = 13.sp,
+                color = LocalIslandInk.current.copy(alpha = 0.35f), fontSize = 13.sp,
             )
         }
 
@@ -310,7 +310,7 @@ private fun MediaExpanded(m: MediaInfo, s: IslandSettings, lyrics: Lyrics?) {
                 modifier = Modifier.width(34.dp))
             SeekBar(
                 fraction = if (m.durationMs > 0) pos.toFloat() / m.durationMs else 0f,
-                color = Color.White,
+                color = LocalIslandInk.current,
                 enabled = m.canSeek && m.durationMs > 0,
                 onSeek = { f -> Controls.seekTo((f * m.durationMs).toLong()) },
                 modifier = Modifier.weight(1f),
@@ -375,7 +375,7 @@ private fun CallExpanded(c: CallInfo) {
         }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f).clickable { Controls.openCall(context, c) }) {
-            Text(c.name, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
+            Text(c.name, color = LocalIslandInk.current, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
                 overflow = TextOverflow.Ellipsis)
             Text(formatDuration(now - c.base), color = Tints.Green, fontSize = 15.sp, style = Digits)
         }
@@ -409,8 +409,8 @@ private fun KaraokeLine(lyrics: Lyrics, pos: Long, s: IslandSettings) {
         val chars = if (s.reduceEffects) text.length else (text.length * (sung / 0.85f).coerceAtMost(1f)).toInt()
         Text(
             buildAnnotatedString {
-                withStyle(SpanStyle(color = Color.White)) { append(text.take(chars)) }
-                withStyle(SpanStyle(color = Color.White.copy(alpha = 0.32f))) { append(text.drop(chars)) }
+                withStyle(SpanStyle(color = LocalIslandInk.current)) { append(text.take(chars)) }
+                withStyle(SpanStyle(color = LocalIslandInk.current.copy(alpha = 0.32f))) { append(text.drop(chars)) }
             },
             fontSize = 14.5.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis,
             modifier = Modifier.fillMaxWidth(),
@@ -598,7 +598,7 @@ private fun TorchCard(t: TorchState, s: IslandSettings) {
                 modifier = Modifier.padding(top = 20.dp).size(58.dp),
             )
             Spacer(Modifier.height(14.dp))
-            Text(label, color = Color.White.copy(alpha = 0.7f), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+            Text(label, color = LocalIslandInk.current.copy(alpha = 0.7f), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
         }
     }
 }
@@ -708,7 +708,7 @@ private fun ProgressExpanded(p: ProgressInfo) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             AppIcon(p.icon, 44.dp, Ios.download, Tints.Blue)
             Spacer(Modifier.width(14.dp))
-            Text(p.title, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 2,
+            Text(p.title, color = LocalIslandInk.current, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 2,
                 overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
             if (!p.indeterminate) {
                 Spacer(Modifier.width(8.dp))
@@ -738,9 +738,9 @@ private fun LiveExpanded(l: LiveInfo) {
         Spacer(Modifier.width(16.dp))
         Column(Modifier.weight(1f).padding(top = 2.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             if (l.distance != null) {
-                Text(l.distance, color = Color.White, fontSize = 27.sp, style = Digits.copy(fontWeight = FontWeight.Bold), maxLines = 1)
+                Text(l.distance, color = LocalIslandInk.current, fontSize = 27.sp, style = Digits.copy(fontWeight = FontWeight.Bold), maxLines = 1)
             } else {
-                Text(l.title, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(l.title, color = LocalIslandInk.current, fontSize = 20.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
             if (l.text.isNotEmpty()) {
                 Text(l.text, color = Tints.Gray, fontSize = 14.sp, lineHeight = 18.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -777,7 +777,7 @@ private fun ChargingExpanded(b: BatteryInfo) {
         }
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
-            Text(tr("Заряжается", "Charging"), color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+            Text(tr("Заряжается", "Charging"), color = LocalIslandInk.current, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(8.dp))
             Box(Modifier.fillMaxWidth().height(10.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.15f))) {
                 Box(Modifier.fillMaxWidth(b.level.coerceIn(0, 100) / 100f).fillMaxHeight().clip(CircleShape).background(Tints.Green))
@@ -798,13 +798,13 @@ private fun IdleExpanded(s: IslandSettings, battery: BatteryInfo) {
     val now = rememberWallNow(1000)
     val time = DateFormat.getTimeFormat(context).format(Date(now))
     // «Пятница, 24 октября» или «Friday, October 24» — на языке острова
-    val date = SimpleDateFormat(if (Lang.en) "EEEE, MMMM d" else "EEEE, d MMMM", Lang.locale).format(Date(now))
+    val date = SimpleDateFormat(if (Lang.code == "ru") "EEEE, d MMMM" else "EEEE, MMMM d", Lang.locale).format(Date(now))
         .replaceFirstChar { it.titlecase(Lang.locale) }
     val alarm by IslandBus.nextAlarm.collectAsState()
     Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(clockText(time, 36.sp), color = Color.White, fontSize = 36.sp, style = Digits)
+                Text(clockText(time, 36.sp), color = LocalIslandInk.current, fontSize = 36.sp, style = Digits)
                 Text(date, color = Dim, fontSize = 14.sp)
                 // Ближайший будильник в пределах суток — под датой, как на экране блокировки iPhone
                 alarm?.takeIf { it.triggerAt - now in 1..86_400_000L }?.let { a ->
@@ -827,12 +827,12 @@ private fun IdleExpanded(s: IslandSettings, battery: BatteryInfo) {
                         tint = when {
                             battery.charging -> Tints.Green
                             battery.level <= 15 -> Tints.Red
-                            else -> Color.White
+                            else -> LocalIslandInk.current
                         },
                         modifier = Modifier.size(22.dp),
                     )
                     Spacer(Modifier.width(4.dp))
-                    Text("${battery.level}%", color = Color.White, fontSize = 16.sp, style = Digits)
+                    Text("${battery.level}%", color = LocalIslandInk.current, fontSize = 16.sp, style = Digits)
                 }
             }
         }
@@ -849,7 +849,7 @@ private fun IdleExpanded(s: IslandSettings, battery: BatteryInfo) {
                     SettingsRepo.update { copy(timerMinutes = (timerMinutes - 1).coerceAtLeast(1)) }
                 }
                 Text(
-                    tr("${s.timerMinutes} мин", "${s.timerMinutes} min"), color = Color.White, fontSize = 16.sp, style = Digits,
+                    tr("${s.timerMinutes} мин", "${s.timerMinutes} min"), color = LocalIslandInk.current, fontSize = 16.sp, style = Digits,
                     textAlign = TextAlign.Center, modifier = Modifier.weight(1f),
                 )
                 RoundButton(Ios.add, size = 38.dp, iconScale = 0.44f) {

@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
@@ -39,7 +40,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.orubus.island.core.tr
+import app.orubus.island.service.IslandEngine
 import app.orubus.island.service.AdbShield
+import app.orubus.island.service.WirelessAdb
 import app.orubus.island.ui.Page
 import app.orubus.island.ui.SectionHeader
 import app.orubus.island.ui.Ui
@@ -64,6 +67,11 @@ fun AdbScreen(onBack: () -> Unit) {
     var steps by remember { mutableStateOf(listOf<AdbShield.Step>()) }
     var address by remember { mutableStateOf(AdbShield.ownAddress() ?: "192.168.1.2") }
     var port by remember { mutableStateOf("") }
+    var pairPort by remember { mutableStateOf("") }
+    var pairCode by remember { mutableStateOf("") }
+    var wirelessBusy by remember { mutableStateOf(false) }
+    var wirelessNote by remember { mutableStateOf<String?>(null) }
+    var wirelessSteps by remember { mutableStateOf(listOf<AdbShield.Step>()) }
 
     Page(tr("Экранный щит", "Popup shield"), onBack,
         subtitle = tr("Выключаем системные всплывающие плашки — после этого двойных поп-апов не бывает ни у одного приложения",
@@ -201,6 +209,128 @@ fun AdbScreen(onBack: () -> Unit) {
             if (steps.isNotEmpty()) {
                 Spacer(Modifier.height(14.dp))
                 steps.forEach { step ->
+                    Row(
+                        Modifier.fillMaxWidth().padding(vertical = 5.dp),
+                        verticalAlignment = Alignment.Top,
+                    ) {
+                        Icon(
+                            if (step.ok) Icons.Rounded.Check else Icons.Rounded.Close, null,
+                            tint = if (step.ok) app.orubus.island.core.Tints.Green else app.orubus.island.core.Tints.Red,
+                            modifier = Modifier.size(17.dp).padding(top = 1.dp),
+                        )
+                        Spacer(Modifier.width(9.dp))
+                        Column {
+                            Text(step.command, color = Ui.Text, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+                            if (step.output.isNotBlank()) {
+                                Text(step.output, color = Ui.Sub, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── Беспроводная отладка Android 11+ ──
+        SectionHeader(tr("Беспроводная отладка · Android 11+", "Wireless debugging · Android 11+"))
+        Column(Modifier.fillMaxWidth().glassCard(RoundedCornerShape(24.dp)).padding(20.dp)) {
+            Text(
+                tr(
+                    "Один раз спарьтесь с «Беспроводной отладкой» — и остров получит WRITE_SECURE_SETTINGS сам, без компьютера: «Настройки» → «Для разработчиков» → «Отладка по Wi-Fi» → «Сопряжение устройства с кодом». Введите здесь адрес, порт спарки и шесть цифр кода, а также главный порт отладки — спарка пройдёт и команды щита выполнятся сразу. После этого остров поднимает себя сам после любого сбоя.",
+                    "Pair once with Wireless debugging and the island gets WRITE_SECURE_SETTINGS by itself, no computer: Settings → Developer options → Wireless debugging → “Pair device with pairing code”. Enter the address, the pairing port and the six-digit code here, plus the main debugging port — pairing runs and the shield commands apply right away. After that the island revives itself after any crash.",
+                ),
+                color = Ui.Sub, fontSize = 13.sp, lineHeight = 18.sp,
+            )
+            Spacer(Modifier.height(14.dp))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                AddressField(
+                    value = address,
+                    onValue = { address = it },
+                    hint = "192.168.1.2",
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            Spacer(Modifier.height(10.dp))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                AddressField(
+                    value = pairPort,
+                    onValue = { pairPort = it.filter { c -> c.isDigit() }.take(5) },
+                    hint = tr("порт спарки", "pairing port"),
+                    modifier = Modifier.weight(1f),
+                )
+                AddressField(
+                    value = pairCode,
+                    onValue = { pairCode = it.filter { c -> c.isDigit() }.take(6) },
+                    hint = tr("код · 6 цифр", "code · 6 digits"),
+                    modifier = Modifier.weight(1f),
+                )
+                AddressField(
+                    value = port,
+                    onValue = { port = it.filter { c -> c.isDigit() }.take(5) },
+                    hint = tr("главный порт", "main port"),
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            Spacer(Modifier.height(12.dp))
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(CircleShape)
+                    .background(if (wirelessBusy) Ui.IconBg else Ui.Primary)
+                    .clickable(enabled = !wirelessBusy) {
+                        val pp = pairPort.toIntOrNull()
+                        val mp = port.toIntOrNull()
+                        val code = pairCode.trim()
+                        if (address.isBlank() || pp == null || mp == null || pp !in 1..65535 || mp !in 1..65535 || code.length != 6) {
+                            wirelessNote = tr(
+                                "Нужны адрес, порт спарки, главный порт и код из 6 цифр",
+                                "Needs the address, the pairing port, the main port and a 6-digit code",
+                            )
+                        } else {
+                            wirelessBusy = true
+                            wirelessNote = null
+                            wirelessSteps = emptyList()
+                            scope.launch {
+                                try {
+                                    wirelessSteps = WirelessAdb.pairAndRun(context, address.trim(), pp, mp, code) {
+                                        wirelessNote = it
+                                    }
+                                    headsUp = AdbShield.headsUpOff(context.contentResolver)
+                                    direct = AdbShield.canApplyDirectly(context)
+                                    IslandEngine.refreshSelfHeal(context)
+                                    wirelessNote = if (wirelessSteps.all { it.ok }) {
+                                        tr("Спарено: щит стоит, WRITE_SECURE_SETTINGS выдан — остров лечится сам",
+                                            "Paired: the shield is up, WRITE_SECURE_SETTINGS granted — the island heals itself")
+                                    } else {
+                                        tr("Спарка прошла, но часть команд не удалась — смотрите вывод ниже",
+                                            "Paired, but some commands failed — see the output below")
+                                    }
+                                } catch (e: Exception) {
+                                    wirelessNote = e.message ?: tr("Спарка не вышла", "Pairing failed")
+                                }
+                                wirelessBusy = false
+                            }
+                        }
+                    }
+                    .padding(vertical = 13.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Rounded.Wifi, null, tint = if (wirelessBusy) Ui.Sub else Ui.OnPrimary, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        if (wirelessBusy) tr("Спариваюсь и выполняю…", "Pairing and running…")
+                        else tr("Спариться и включить щит", "Pair and enable the shield"),
+                        color = if (wirelessBusy) Ui.Sub else Ui.OnPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+                    )
+                }
+            }
+            wirelessNote?.let {
+                Spacer(Modifier.height(10.dp))
+                Text(it, color = Ui.Sub, fontSize = 13.sp)
+            }
+            if (wirelessSteps.isNotEmpty()) {
+                Spacer(Modifier.height(14.dp))
+                wirelessSteps.forEach { step ->
                     Row(
                         Modifier.fillMaxWidth().padding(vertical = 5.dp),
                         verticalAlignment = Alignment.Top,

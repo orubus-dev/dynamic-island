@@ -21,6 +21,7 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Contrast
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.Layers
+import androidx.compose.material.icons.rounded.LightMode
 import androidx.compose.material.icons.rounded.LineWeight
 import androidx.compose.material.icons.rounded.Texture
 import androidx.compose.material.icons.rounded.Water
@@ -41,6 +42,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.orubus.island.core.tr
+import app.orubus.island.data.GlassLight
 import app.orubus.island.data.Elasticity
 import app.orubus.island.data.SettingsRepo
 import app.orubus.island.ui.ChoiceDialog
@@ -68,6 +70,7 @@ private val outlineColors = listOf(
 fun ColorsScreen(onBack: () -> Unit) {
     val s by SettingsRepo.state.collectAsState()
     var elasticityDialog by remember { mutableStateOf(false) }
+    var glassLightDialog by remember { mutableStateOf(false) }
     Page(tr("Цвет и стекло", "Color & glass"), onBack) {
         IslandPreview()
 
@@ -114,6 +117,8 @@ fun ColorsScreen(onBack: () -> Unit) {
                 s.glassBlurBehind, color = Tile.Indigo) { v ->
                 SettingsRepo.update { copy(glassBlurBehind = v) }
             }
+            GroupItem(Pos.Middle, Icons.Rounded.LightMode, tr("Светлое стекло", "Light glass"), s.glassLight.title,
+                onClick = { glassLightDialog = true }, color = Tile.Teal) { Arrow() }
             GroupToggle(Pos.Last, Icons.Rounded.Water, tr("Жидкое раскрытие", "Liquid expansion"),
                 tr("Новое содержимое вырастает из прежнего вместе с островом и проявляется из размытия",
                     "New content grows out of the old together with the island, fading in from blur"),
@@ -138,6 +143,10 @@ fun ColorsScreen(onBack: () -> Unit) {
     if (elasticityDialog) {
         ChoiceDialog(tr("Упругость раскрытия", "Expansion bounce"), Elasticity.entries, s.elasticity, { it.title },
             { v -> SettingsRepo.update { copy(elasticity = v) } }) { elasticityDialog = false }
+    }
+    if (glassLightDialog) {
+        ChoiceDialog(tr("Светлое стекло", "Light glass"), GlassLight.entries, s.glassLight, { it.title },
+            { v -> SettingsRepo.update { copy(glassLight = v) } }) { glassLightDialog = false }
     }
 }
 

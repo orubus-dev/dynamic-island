@@ -135,9 +135,9 @@ object LiveParser {
 
     private val ruUnit = Regex("""(\d+)(?:,(\d+))?\s?(км|метров|метра|мин|м|ч)\.?(?!\p{L})""")
 
-    /** По-английски — и единицы: «4,2 км» → «4.2 km», «12 мин» → «12 min». Иначе как прислал навигатор. */
+    /** Не по-русски — и единицы: «4,2 км» → «4.2 km», «12 мин» → «12 min». Иначе как прислал навигатор. */
     fun units(s: String): String {
-        if (!Lang.en) return s
+        if (Lang.code == "ru") return s
         return ruUnit.replace(s) { m ->
             val (whole, frac, unit) = m.destructured
             val n = if (frac.isEmpty()) whole else "$whole.$frac"

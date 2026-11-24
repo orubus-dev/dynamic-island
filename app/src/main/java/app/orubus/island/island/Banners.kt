@@ -80,7 +80,7 @@ fun SentBanner(n: Notice, s: IslandSettings, wideWidth: Dp) {
                 Icon(ImageVector.vectorResource(R.drawable.ios_check), null, tint = onAccent(n.tint), modifier = Modifier.size(height * 0.26f))
             }
             Spacer(Modifier.width(10.dp))
-            Text(n.title, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+            Text(n.title, color = LocalIslandInk.current, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
         }
         Spacer(Modifier.width(compactGap(s)))
         Row(Modifier.weight(1f), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
@@ -117,7 +117,7 @@ fun UpdateCard(n: Notice, s: IslandSettings, wideWidth: Dp) {
             AppMark(n, 48.dp)
             Spacer(Modifier.width(13.dp))
             Column(Modifier.weight(1f)) {
-                Text(n.title, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
+                Text(n.title, color = LocalIslandInk.current, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
                     overflow = TextOverflow.Ellipsis)
                 // Пока качается, справа кольцо — вместо длинной подписи коротко, что происходит
                 val caption = if (loading) tr("Скачивается…", "Downloading…") else n.caption

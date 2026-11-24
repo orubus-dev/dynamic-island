@@ -503,7 +503,7 @@ fun EggBanner(n: Notice, s: IslandSettings) {
                 .border(2.5.dp, Color.White, RoundedCornerShape(3.dp))
                 .padding(horizontal = 14.dp, vertical = 12.dp),
         ) {
-            Text("*", color = Color.White, fontSize = 15.sp, lineHeight = 21.sp, fontFamily = FontFamily.Monospace)
+            Text("*", color = LocalIslandInk.current, fontSize = 15.sp, lineHeight = 21.sp, fontFamily = FontFamily.Monospace)
             Spacer(Modifier.width(10.dp))
             // Ещё не напечатанное уже занимает место — строки не перескакивают, пока текст печатается
             Text(
@@ -511,7 +511,7 @@ fun EggBanner(n: Notice, s: IslandSettings) {
                     append(line.take(typed))
                     withStyle(SpanStyle(color = Color.Transparent)) { append(line.drop(typed)) }
                 },
-                color = Color.White, fontSize = 15.sp, lineHeight = 21.sp, fontFamily = FontFamily.Monospace,
+                color = LocalIslandInk.current, fontSize = 15.sp, lineHeight = 21.sp, fontFamily = FontFamily.Monospace,
                 maxLines = 3, overflow = TextOverflow.Ellipsis,
             )
         }

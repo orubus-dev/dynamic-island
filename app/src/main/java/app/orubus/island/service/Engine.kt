@@ -96,15 +96,26 @@ object IslandEngine {
 
     /**
      * Оживить остров. Возвращает true, если удалось (или уже оживаем), false — если остаётся
-     * только сообщить человеку.
+     * только сообщить человеку. Помимо переподключения службы спец. возможностей заново
+     * привязывается слушатель уведомлений — после сбоя умирают обе службы, не одна.
      */
     fun heal(context: Context): Boolean {
         val now = SystemClock.elapsedRealtime()
         val h = health.value
         if (h.state == State.RECOVERING && now - h.lastHeal < HEAL_COOLDOWN_MS) return true
         health.update { it.copy(state = State.RECOVERING, heals = it.heals + 1, lastHeal = now) }
-        val ok = reEnableAccessibility(context)
-        if (!ok) announce(context)
+        var ok = reEnableAccessibility(context)
+        // Слушатель уведомлений умирает отдельно: перепривязываем и его, чтобы музыка, сообщения
+        // и таймеры не пропадали до следующего сбоя
+        runCatching {
+            val nm = context.getSystemService(NotificationManager::class.java)
+            NotificationManager::class.java
+                .getMethod("requestRebind", ComponentName::class.java)
+                .invoke(nm, ComponentName(context, NotifListener::class.java))
+        }
+        // Щит и разрешение — тоже после сбоя: если WRITE_SECURE_SETTINGS уже выдан, применяем всё
+        if (ok && canWriteSecureSettings(context)) runCatching { AdbShield.applyDirectly(context) }
+        if (ok) announceRevived(context) else announce(context)
         return ok
     }
 
@@ -170,6 +181,21 @@ object IslandEngine {
         runCatching { nm?.notify(NOTIF_ID, notif) }
     }
 
+    /** Остров ожил после сбоя: короткая плашка — без системного уведомления, тревоги не надо. */
+    private fun announceRevived(context: Context) {
+        if (!IslandBus.serviceRunning.value) return
+        if (health.value.heals <= 1) return // первое включение — не «оживление»
+        IslandBus.post(
+            Notice(
+                tr("Остров ожил", "Island revived"),
+                tr("Службы снова работают", "Services are back up"),
+                Ios.load(context, R.drawable.ios_checkmark_circle),
+                Tints.Green,
+                style = NoticeStyle.PILL,
+            ),
+        )
+    }
+
     /** Цикл слежения: живёт в [KeepAliveService], проверяет пульс и оживляет упавший остров. */
     fun watch(context: Context, scope: CoroutineScope): Job = scope.launch(Dispatchers.Default) {
         refreshSelfHeal(context)
@@ -218,6 +244,13 @@ class Resurrector : BroadcastReceiver() {
             // После сбоя система часто оставляет службу «включённой», но не привязанной:
             // переключение «выкл → вкл» заставляет систему привязать её заново
             if (s.autoHeal && IslandEngine.canWriteSecureSettings(context)) IslandEngine.reEnableAccessibility(context)
+            // Слушатель уведомлений тоже перепривязываем: после загрузки он часто не подключается сам
+            runCatching {
+                val nm = context.getSystemService(NotificationManager::class.java)
+                NotificationManager::class.java
+                    .getMethod("requestRebind", ComponentName::class.java)
+                    .invoke(nm, ComponentName(context, NotifListener::class.java))
+            }
         }
     }
 }

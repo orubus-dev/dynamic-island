@@ -117,7 +117,7 @@ object AdbShield {
     // ─────────────────────────── Ключ RSA ───────────────────────────
 
     /** Свой ключ adb: как ~/.android/adbkey, только внутри приложения (файлы приложения приватны). */
-    private fun keyPair(context: Context): KeyPair {
+    internal fun keyPair(context: Context): KeyPair {
         val file = File(context.filesDir, "adb_key")
         if (file.exists()) {
             runCatching {
@@ -138,11 +138,9 @@ object AdbShield {
         return pair
     }
 
-    /**
-     * Публичный ключ в формате adbd (struct RSAPublicKey из android_pubkey.c):
-     * little-endian: длина в словах, Montgomery-коэффициент, модуль, R², экспонента.
-     */
-    private fun adbPubkeyBlob(key: KeyPair): ByteArray {
+    /** Публичный ключ в формате adbd (struct RSAPublicKey из android_pubkey.c):
+     * little-endian: длина в словах, Montgomery-коэффициент, модуль, R², экспонента. */
+    internal fun adbPubkeyBlob(key: KeyPair): ByteArray {
         val pub = key.public as RSAPublicKey
         val n = pub.modulus
         val bits = n.bitLength()
@@ -186,7 +184,7 @@ object AdbShield {
 
     private class Frame(val cmd: Int, val arg0: Int, val arg1: Int, val data: ByteArray)
 
-    private class Conn(socket: Socket) {
+    internal class Conn(socket: Socket) {
         val input = DataInputStream(BufferedInputStream(socket.getInputStream()))
         val output = DataOutputStream(BufferedOutputStream(socket.getOutputStream()))
         var maxData: Int = 4096
@@ -234,7 +232,7 @@ object AdbShield {
         }
     }
 
-    private class Session(private val socket: Socket, key: KeyPair) {
+    internal class Session(private val socket: Socket, key: KeyPair) {
         private val conn = Conn(socket)
         private var localId = 1
 

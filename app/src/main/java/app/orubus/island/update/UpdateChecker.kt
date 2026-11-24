@@ -335,7 +335,7 @@ object UpdateChecker {
  */
 fun localNotes(markdown: String): List<String> {
     val all = markdown.lines()
-    val start = all.indexOfFirst { it.startsWith("## ") && (if (Lang.en) "English" in it else "Русский" in it) }
+    val start = all.indexOfFirst { it.startsWith("## ") && (if (Lang.code == "ru") "Русский" in it else "English" in it) }
     if (start < 0) return all
     val rest = all.drop(start + 1)
     val end = rest.indexOfFirst { it.startsWith("## ") && ("English" in it || "Русский" in it) }

@@ -41,7 +41,6 @@ object PayMonitor {
         "ru.alfabank.mobile.android", // Альфа-Банк (Alfa Pay)
         "ru.sberbankmobile", // СберБанк (SberPay)
         "ru.vtb24.mobilebanking.android", // ВТБ
-        "ru.raiffeisennews", // Райффайзен
         "ru.gazprombank.android.mobilebank.app", // Газпромбанк
         "ru.sovcomcard.halva.v1", // Халва
         "ru.mts.money", // МТС Банк

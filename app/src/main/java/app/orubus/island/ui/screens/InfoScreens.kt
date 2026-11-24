@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.PrivacyTip
 import androidx.compose.material.icons.rounded.CreditCard
 import androidx.compose.material.icons.rounded.Description
@@ -197,7 +198,10 @@ fun AppInfoScreen(open: (Screen) -> Unit) {
 
         SectionHeader(tr("Обновления", "Updates"))
         Group {
-            GroupToggle(Pos.First, Icons.Rounded.SystemUpdate, tr("Искать обновления", "Check for updates"),
+            GroupItem(Pos.First, Icons.Rounded.Language, tr("Язык", "Language"),
+                SettingsRepo.current.language.native,
+                onClick = { open(Screen.LANGUAGE) }, color = Tile.Teal) { Arrow() }
+            GroupToggle(Pos.Middle, Icons.Rounded.SystemUpdate, tr("Искать обновления", "Check for updates"),
                 tr("Раз в 3 часа смотреть на GitHub, не вышла ли новая версия", "Look on GitHub every 3 hours for a new version"),
                 s.autoUpdateCheck, color = Tile.Green) { v ->
                 SettingsRepo.update { copy(autoUpdateCheck = v) }

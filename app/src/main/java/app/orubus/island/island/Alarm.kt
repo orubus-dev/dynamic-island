@@ -68,7 +68,7 @@ import kotlin.math.sin
 /** Будильник оранжевый, как на iPhone; ночь — индиго, как в «Режиме сна» */
 val AlarmTint = Tints.Orange
 private val NightTint = Color(0xFF7D7AFF)
-private val Dim = Color.White.copy(alpha = 0.55f)
+private val Dim: Color @Composable get() = LocalIslandDim.current
 private const val DAY = 86_400_000L
 
 /** За сколько до будильника он появляется в острове. */
@@ -117,7 +117,7 @@ fun alarmDay(triggerAt: Long, now: Long): String {
         0L -> tr("сегодня", "today")
         1L -> tr("завтра", "tomorrow")
         // По-русски день недели строчными («завтра», «пятница»), по-английски — с большой («Friday»)
-        else -> SimpleDateFormat("EEEE", Lang.locale).format(Date(triggerAt)).let { if (Lang.en) it else it.lowercase(Lang.locale) }
+        else -> SimpleDateFormat("EEEE", Lang.locale).format(Date(triggerAt)).let { if (Lang.code == "ru") it.lowercase(Lang.locale) else it }
     }
 }
 
@@ -214,7 +214,7 @@ fun SleepDial(now: Long, triggerAt: Long, modifier: Modifier = Modifier, compact
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     "%d:%02d".format(left / 3_600_000, left / 60_000 % 60),
-                    color = Color.White, fontSize = 17.sp, style = Digits, maxLines = 1,
+                    color = LocalIslandInk.current, fontSize = 17.sp, style = Digits, maxLines = 1,
                 )
                 Text(if (isWakeUp(triggerAt)) tr("сна", "of sleep") else tr("до звонка", "until alarm"), color = Dim, fontSize = 9.sp, maxLines = 1)
             }
@@ -272,7 +272,7 @@ fun AlarmExpanded(a: AlarmInfo, s: IslandSettings) {
         Column(Modifier.weight(1f)) {
             Text("${if (wake) tr("Подъём", "Wake up") else tr("Будильник", "Alarm")} · ${alarmDay(a.triggerAt, now)}",
                 color = Dim, fontSize = 14.sp, maxLines = 1)
-            Text(clockText(wakeTime(context, a.triggerAt), 44.sp), color = Color.White, fontSize = 44.sp,
+            Text(clockText(wakeTime(context, a.triggerAt), 44.sp), color = LocalIslandInk.current, fontSize = 44.sp,
                 style = Digits.copy(fontWeight = FontWeight.Normal), maxLines = 1)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(if (wake) Ios.moon else Ios.alarm, null, tint = if (wake) NightTint else AlarmTint, modifier = Modifier.size(15.dp))
@@ -306,7 +306,7 @@ fun AlarmBanner(n: Notice, a: AlarmInfo, s: IslandSettings, wideWidth: Dp) {
             Spacer(Modifier.width(10.dp))
             Column {
                 Text(if (wake) tr("Подъём", "Wake up") else tr("Будильник", "Alarm"), color = Dim, fontSize = 12.sp, maxLines = 1)
-                Text(clockText(wakeTime(context, a.triggerAt), 20.sp), color = Color.White, fontSize = 20.sp, style = Digits, maxLines = 1)
+                Text(clockText(wakeTime(context, a.triggerAt), 20.sp), color = LocalIslandInk.current, fontSize = 20.sp, style = Digits, maxLines = 1)
             }
         }
         Spacer(Modifier.width(compactGap(s)))

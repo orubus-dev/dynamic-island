@@ -13,8 +13,11 @@ android {
         applicationId = "app.orubus.island"
         minSdk = 26
         targetSdk = 35
-        versionCode = 21
-        versionName = "1.14.0"
+        versionCode = 22
+        versionName = "2.0.0"
+
+        // Языки интерфейса: файлы ресурсов только на этих языках, ар не перекодируется при сборке
+        resourceConfigurations += listOf("en", "ru", "es", "fr", "de", "pt", "ar")
     }
 
     // Ключ подписи в репозитории не хранится: релизный APK собирается без подписи,
@@ -61,4 +64,10 @@ dependencies {
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+
+    // «Беспроводная отладка» Android 11+: TLS 1.3 с экспортом ключевого материала сеанса (Conscrypt),
+    // самоподписанный сертификат (BouncyCastle) и SPAKE2 как в BoringSSL (spake2-java, LGPL-3.0 —
+    // исходники зашиты в io.github.muntashirakon.crypto с лицензией рядом)
+    implementation("org.conscrypt:conscrypt-android:2.5.2")
+    implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
 }

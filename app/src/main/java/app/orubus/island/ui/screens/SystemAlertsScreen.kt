@@ -16,6 +16,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Public
+import androidx.compose.material.icons.rounded.SimCardAlert
+import androidx.compose.material.icons.rounded.Storage
+import androidx.compose.material.icons.rounded.VpnKey
 import androidx.compose.material.icons.rounded.AccountBalance
 import androidx.compose.material.icons.rounded.AirplanemodeActive
 import androidx.compose.material.icons.rounded.AirplanemodeInactive
@@ -240,6 +244,41 @@ fun SystemAlertsScreen(onBack: () -> Unit, open: (Screen) -> Unit) {
             GroupToggle(Pos.Last, Icons.Rounded.Screenshot, tr("Скриншот сделан", "Screenshot taken"),
                 tr("Плашка, когда вы делаете скриншот", "A notice when you take a screenshot"),
                 s.evScreenshot, color = Tile.Gray) { set { copy(evScreenshot = it) } }
+        }
+
+        // Состояния телефона: пока что-то включено, капсула у выреза об этом говорит
+        SectionHeader(tr("Состояния", "States"))
+        Column(Modifier.fillMaxWidth().glassCard(RoundedCornerShape(28.dp)).padding(12.dp)) {
+            GroupToggle(Pos.First, Icons.Rounded.VpnKey, tr("VPN", "VPN"),
+                tr("Пока туннель поднят — значок щита в капсуле", "While the tunnel is up, a shield icon in the capsule"),
+                s.stVpn, color = Tile.Blue) { set { copy(stVpn = it) } }
+            GroupToggle(Pos.Middle, Icons.Rounded.WifiTethering, tr("Точка доступа", "Hotspot"),
+                tr("Пока телефон делится интернетом", "While the phone shares its connection"),
+                s.stHotspot, color = Tile.Blue) { set { copy(stHotspot = it) } }
+            GroupToggle(Pos.Middle, Icons.Rounded.DoNotDisturbOn, tr("Не беспокоить", "Do not disturb"),
+                tr("Луна в капсуле, пока режим активен", "A moon in the capsule while the mode is on"),
+                s.stDnd, color = Tile.Indigo) { set { copy(stDnd = it) } }
+            GroupToggle(Pos.Middle, Icons.Rounded.AirplanemodeActive, tr("Режим полёта", "Airplane mode"),
+                tr("Пока радиомодули выключены", "While the radios are off"),
+                s.stAirplane, color = Tile.Orange) { set { copy(stAirplane = it) } }
+            GroupToggle(Pos.Middle, Icons.Rounded.NotificationsOff, tr("Без звука и вибрация", "Silent and vibrate"),
+                tr("Перечёркнутый колокольчик, пока звук убран", "A crossed-out bell while the sound is off"),
+                s.stRinger, color = Tile.Gray) { set { copy(stRinger = it) } }
+            GroupToggle(Pos.Middle, Icons.Rounded.BatterySaver, tr("Экономия заряда", "Battery saver"),
+                tr("Пока Android экономит заряд", "While Android saves power"),
+                s.stPowerSave, color = Tile.Yellow) { set { copy(stPowerSave = it) } }
+            GroupToggle(Pos.Middle, Icons.Rounded.BatteryAlert, tr("Низкий заряд", "Low battery"),
+                tr("Батарейка красная, пока не подключите зарядку", "The battery turns red until you plug in"),
+                s.stLowBattery, color = Tile.Red) { set { copy(stLowBattery = it) } }
+            GroupToggle(Pos.Middle, Icons.Rounded.Public, tr("Роуминг", "Roaming"),
+                tr("Пока передача данных в роуминге", "While data roaming is on"),
+                s.stRoaming, color = Tile.Orange) { set { copy(stRoaming = it) } }
+            GroupToggle(Pos.Middle, Icons.Rounded.Storage, tr("Мало места", "Storage low"),
+                tr("Когда свободно меньше 1,5 ГБ", "When less than 1.5 GB is free"),
+                s.stStorage, color = Tile.Orange) { set { copy(stStorage = it) } }
+            GroupToggle(Pos.Last, Icons.Rounded.SimCardAlert, tr("Нет SIM-карты", "No SIM"),
+                tr("Когда SIM не вставлена или не работает", "When the SIM is missing or dead"),
+                s.stSim, color = Tile.Red) { set { copy(stSim = it) } }
         }
     }
 }

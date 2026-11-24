@@ -81,6 +81,7 @@ import app.orubus.island.ui.screens.HomeScreen
 import app.orubus.island.ui.screens.IdeaScreen
 import app.orubus.island.ui.screens.InstructionScreen
 import app.orubus.island.ui.screens.KeepAliveScreen
+import app.orubus.island.ui.screens.LanguageScreen
 import app.orubus.island.ui.screens.LookScreen
 import app.orubus.island.ui.screens.LyricsScreen
 import app.orubus.island.ui.screens.LicensesScreen
@@ -90,6 +91,7 @@ import app.orubus.island.ui.screens.PermissionsScreen
 import app.orubus.island.ui.screens.PrivacyScreen
 import app.orubus.island.ui.screens.SizeScreen
 import app.orubus.island.ui.screens.SystemAlertsScreen
+import app.orubus.island.ui.screens.StartupLanguage
 import app.orubus.island.ui.screens.TestsScreen
 import app.orubus.island.ui.screens.WhatsNewScreen
 import app.orubus.island.service.KeepAliveService
@@ -97,7 +99,7 @@ import app.orubus.island.update.UpdateChecker
 
 enum class Screen {
     CARDS, EVENTS, GESTURES, LYRICS, SIZE, COLORS, INSTRUCTION, ABOUT, DIAG, LOOK, ANIM, EFFECTS, BANNERS,
-    PERMISSIONS, TESTS, NOTIFICATIONS, BEHAVIOR, PAYDIAG, KEEPALIVE, BANKS, DISPLAY, WHATSNEW, PRIVACY, FEATURES, BT, LICENSES, ADB,
+    PERMISSIONS, TESTS, NOTIFICATIONS, BEHAVIOR, PAYDIAG, KEEPALIVE, BANKS, DISPLAY, WHATSNEW, PRIVACY, FEATURES, BT, LICENSES, ADB, LANGUAGE,
 }
 
 class MainActivity : ComponentActivity() {
@@ -120,6 +122,12 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun AppRoot() {
+    // Первый запуск: сначала язык, потом всё остальное. После обновления выбор не возвращается
+    var languageDone by rememberSaveable { mutableStateOf(SettingsRepo.hadSavedSettings) }
+    if (!languageDone) {
+        StartupLanguage(onDone = { languageDone = true })
+        return
+    }
     var tab by rememberSaveable { mutableIntStateOf(0) }
     // Стек экранов сохраняется: поворот экрана и смерть процесса не сбрасывают навигацию
     var stackNames by rememberSaveable { mutableStateOf(listOf<String>()) }
@@ -176,6 +184,7 @@ private fun AppRoot() {
                     Screen.PRIVACY.name -> PrivacyScreen(back)
                     Screen.LICENSES.name -> LicensesScreen(back)
                     Screen.ADB.name -> AdbScreen(back)
+                    Screen.LANGUAGE.name -> LanguageScreen(back)
                     Screen.FEATURES.name -> FeaturesScreen(open)
                     Screen.CARDS.name -> CardsScreen(back) { open(Screen.INSTRUCTION) }
                     Screen.GESTURES.name -> GesturesScreen(back)

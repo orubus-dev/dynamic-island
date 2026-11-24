@@ -40,6 +40,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -78,6 +79,7 @@ import app.orubus.island.core.Tints
 import app.orubus.island.core.Turn
 import app.orubus.island.data.AccentMode
 import app.orubus.island.data.ExpandStyle
+import app.orubus.island.data.GlassLight
 import app.orubus.island.data.IslandSettings
 import app.orubus.island.data.SettingsRepo
 import kotlinx.coroutines.delay
@@ -380,21 +382,28 @@ fun Modifier.glassSurface(
     opacity: Float,
     tilt: () -> Float = { 0f },
     sheen: () -> Float = { -1f },
+    light: Boolean = false,
 ): Modifier = drawWithCache {
     val w = size.width
     val h = size.height
     val a = opacity.coerceIn(0.3f, 0.95f)
     val outline = shape.createOutline(size, layoutDirection, this)
     val dp = 1.dp.toPx()
-    // Всё, что не зависит от наклона, собирается один раз на размер, а кадр только рисует
-    val veil = Brush.verticalGradient(
+    // Всё, что не зависит от наклона, собирается один раз на размер, а кадр только рисует.
+    // Светлое стекло — то же самое, но наоборот: белое тело, темнее к низу, и тёмная тень вместо чёрной
+    val veil = if (light) Brush.verticalGradient(
+        0f to Color.White.copy(alpha = 0.5f),
+        0.5f to Color.White.copy(alpha = 0.2f),
+        1f to Color.White.copy(alpha = 0.32f),
+    ) else Brush.verticalGradient(
         0f to Color.White.copy(alpha = 0.20f),
         0.5f to Color.White.copy(alpha = 0.05f),
         1f to Color.White.copy(alpha = 0.10f),
     )
-    val shade = Brush.verticalGradient(0.55f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.28f))
+    val shade = if (light) Brush.verticalGradient(0.55f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.10f))
+    else Brush.verticalGradient(0.55f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.28f))
     val glow = List(7) { i -> Stroke(width = (i + 1) * 2 * dp) }
-    val glowColor = Color.White.copy(alpha = 0.035f)
+    val glowColor = if (light) Color.Black.copy(alpha = 0.045f) else Color.White.copy(alpha = 0.035f)
     val wideRim = Stroke(width = 10 * dp)
     val thinRim = Stroke(width = 3.2f * dp)
     val fringe = Stroke(width = 4 * dp)
@@ -410,14 +419,14 @@ fun Modifier.glassSurface(
         // Свет сверху и каустика у противоположного края
         drawRect(
             Brush.radialGradient(
-                listOf(Color.White.copy(alpha = 0.26f), Color.Transparent),
+                listOf(Color.White.copy(alpha = if (light) 0.55f else 0.26f), Color.Transparent),
                 center = Offset(w * (0.22f + 0.30f * t), 0f),
                 radius = w * 0.55f,
             ),
         )
         drawRect(
             Brush.radialGradient(
-                listOf(Color.White.copy(alpha = 0.20f), Color.Transparent),
+                listOf(Color.White.copy(alpha = if (light) 0.42f else 0.20f), Color.Transparent),
                 center = Offset(w * (0.80f + 0.15f * t), h),
                 radius = w * 0.45f,
             ),
@@ -430,7 +439,7 @@ fun Modifier.glassSurface(
             drawRect(
                 Brush.linearGradient(
                     0f to Color.Transparent,
-                    0.5f to Color.White.copy(alpha = 0.24f),
+                    0.5f to Color.White.copy(alpha = if (light) 0.6f else 0.24f),
                     1f to Color.Transparent,
                     start = Offset(x - w * 0.25f, 0f),
                     end = Offset(x + w * 0.25f, h * 0.6f),
@@ -443,9 +452,18 @@ fun Modifier.glassSurface(
 
         drawContent()
 
-        // Кромка-линза: яркая слева сверху и справа снизу, посередине почти гаснет; при наклоне сдвигается
+        // Кромка-линза: яркая слева сверху и справа снизу, посередине почти гаснет; при наклоне сдвигается.
+        // На светлом стекле светлая кромка всё равно читается — а каёмка чуть темнее, чтобы отделять
         val shift = t * w * 0.35f
-        val rim = Brush.linearGradient(
+        val rim = if (light) Brush.linearGradient(
+            0f to Color(0xFF585C68).copy(alpha = 0.75f),
+            0.18f to Color(0xFF9A9DAB).copy(alpha = 0.35f),
+            0.45f to Color(0xFF9A9DAB).copy(alpha = 0.10f),
+            0.72f to Color(0xFF6E7280).copy(alpha = 0.30f),
+            1f to Color(0xFF3E4250).copy(alpha = 0.75f),
+            start = Offset(-shift, 0f),
+            end = Offset(w - shift, h),
+        ) else Brush.linearGradient(
             0f to Color.White.copy(alpha = 0.95f),
             0.18f to Color.White.copy(alpha = 0.35f),
             0.45f to Color.White.copy(alpha = 0.06f),
@@ -461,6 +479,28 @@ fun Modifier.glassSurface(
         translate(dp, dp) { drawOutline(outline, Color(0xFFFF8AD8).copy(alpha = 0.18f), style = fringe) }
     }
 }
+
+/** Цвет основного текста и значков на стекле: белый на тёмном, почти чёрный на светлом. */
+val LocalIslandInk = staticCompositionLocalOf { Color.White }
+
+/** Цвет второстепенного текста на стекле. */
+val LocalIslandDim = staticCompositionLocalOf { Color.White.copy(alpha = 0.55f) }
+
+/** Чернила светлого стекла: тёмные, но мягкие — как текст iOS на светлом стекле. */
+val IslandInkDark = Color(0xFF16161D)
+
+/** Второстепенный текст светлого стекла. */
+val IslandDimDark = Color(0xFF16161D).copy(alpha = 0.55f)
+
+/** Светлое стекло включено: настройка «светлое» или «как в системе» и тема светлая. */
+fun glassLightOn(s: IslandSettings, darkTheme: Boolean): Boolean = when (s.glassLight) {
+    GlassLight.LIGHT -> true
+    GlassLight.DARK -> false
+    GlassLight.AUTO -> !darkTheme
+}
+
+/** База светлого стекла: молочный, почти белый. */
+val LightGlassBase = Color(0xFFF4F4F8)
 
 /**
  * Знак бесконтактной оплаты (Contactless Indicator, EMVCo) — тот самый, что печатают на терминалах
