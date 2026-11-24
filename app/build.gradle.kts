@@ -41,6 +41,16 @@ android {
     buildFeatures {
         compose = true
     }
+
+    // BouncyCastle кладёт OSGI-манифесты в каждый jar — при сборке они конфликтуют, исключаем
+    packaging {
+        resources.excludes += setOf(
+            "META-INF/versions/9/OSGI-INF/MANIFEST.MF",
+            "META-INF/*.SF",
+            "META-INF/*.DSA",
+            "META-INF/*.RSA",
+        )
+    }
 }
 
 dependencies {
